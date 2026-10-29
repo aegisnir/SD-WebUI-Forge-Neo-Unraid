@@ -1,0 +1,15 @@
+title = "gitleaks"
+
+# Per-repo allowlist for patterns that match secret-detection rules
+# but are intentional and safe in this project.
+
+[allowlist]
+  description = "Known-safe values and files"
+
+  # webui-auth.txt is a committed default-credentials placeholder
+  # (admin:changeme). Users are explicitly instructed to change this on first
+  # login. The file is written with chmod 600 at runtime and is documented
+  # throughout the README. It is not a deployed secret.
+  paths = [
+    '''webui-auth.txt''',
+  ]

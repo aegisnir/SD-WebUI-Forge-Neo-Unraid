@@ -1,0 +1,98 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>SD-WebUI-Forge-Neo-Unraid</Name>
+  <Repository>ghcr.io/aegisnir/sd-webui-forge-neo-unraid:dev</Repository>
+  <Registry>https://ghcr.io</Registry>
+  <Icon>https://raw.githubusercontent.com/aegisnir/sd-webui-forge-neo-unraid/dev/icon.png</Icon>
+  <ExtraParams>--runtime=nvidia --read-only --tmpfs /tmp:rw,noexec,nosuid,nodev,size=2g --security-opt no-new-privileges:true --cap-drop=ALL --cap-add=CHOWN --cap-add=FOWNER --cap-add=SETUID --cap-add=SETGID --pids-limit=2048</ExtraParams>
+  <PostArgs></PostArgs>
+  <Description>
+    Forge Neo (Stable Diffusion WebUI) by Haoming02, packaged for Unraid by Aegisnir, with security hardening.
+    Forge Neo is Haoming02's work: https://github.com/Haoming02/sd-webui-forge-classic/tree/neo
+    This container only packages it for Unraid. Please report WebUI bugs upstream.
+
+    Image: <b>ghcr.io/aegisnir/sd-webui-forge-neo-unraid:dev</b>
+
+    README:
+    <b>https://github.com/aegisnir/sd-webui-forge-neo-unraid/blob/dev/README.md</b>
+
+    ## Security Hardening Defaults
+    The template sets the following security options by default:
+    - <b>--read-only</b>: Makes the container filesystem read-only except for explicitly mounted paths (like /data).
+    - <b>--tmpfs /tmp:rw,noexec,nosuid,nodev,size=2g</b>: Provides a safe, writable /tmp.
+    - <b>--security-opt no-new-privileges:true</b>: Prevents processes from gaining new privileges.
+    - <b>--cap-drop=ALL --cap-add=CHOWN --cap-add=FOWNER --cap-add=SETUID --cap-add=SETGID</b>: Uses a least-privilege capability set needed for startup self-heal and privilege drop.
+    - <b>--pids-limit=2048</b>: A practical default to contain runaway process spawning without being overly restrictive.
+
+    To change PID limit in Unraid: edit this container, switch to advanced view, adjust <b>--pids-limit=&lt;value&gt;</b> in Extra Parameters, and apply.
+
+    <b>DATA DIRECTORY WARNING:</b>
+    The path used with --data-dir grows very large very quickly because it can hold models, outputs, extensions, caches, and other working data.
+    I recommend storing it outside of appdata when possible.
+    You can still place it inside appdata if you want the convenience, but it may consume space very quickly and can fill the location you use for Docker-related storage.
+
+    The default host path is set to /mnt/user/ai/data/ so the large working set lives outside appdata by default.
+
+    <b>Self-healing data directory:</b>
+    The container automatically corrects <b>/data</b> ownership on startup if it is owned by another user (for example, after deleting the host data path, or data copied from another container).
+    In most cases no user action is needed. A log message will confirm when ownership was corrected.
+    If the auto-fix fails (NFS root squash, unusual host permissions), the log will explain the manual fix.
+
+    <b>Authentication defaults:</b>
+    This container uses auth-file based login by default.
+    On first launch, startup seeds <b>/config/auth/webui-auth.txt</b> if missing.
+    <b>Default end-user login (first launch):</b> <b>admin</b> / <b>changeme</b>
+    Startup does not block this default; change it after first login for normal use.
+    Use <b>WEBUI_AUTH_FILE</b> to override the auth-file path if needed.
+    Recommended auth file path: <b>/config/auth/webui-auth.txt</b>
+    Example syntax:
+    - one per line: <b>admin:strong-password</b>
+    - or comma-separated: <b>admin:strong-password,viewer:another-password</b>
+    - lines starting with <b>#</b> are ignored as comments
+
+    <b>Model checkpoint note:</b>
+    Forge Neo never downloads a model on its own. Add a <b>.safetensors</b> file under <b>/data/models/Stable-diffusion</b>.
+
+    <b>Log safety:</b>
+    Sensitive auth flags (<b>--gradio-auth</b>, <b>--gradio-auth-path</b>, <b>--api-auth</b>) have their values replaced with <b>&lt;redacted&gt;</b> in startup log output, so logs are safe to share.
+
+    <b>Built-in healthcheck:</b>
+    The image includes a Docker HEALTHCHECK that probes port 7860. It uses generous timers (5 min start grace, 5 retries) to avoid false positives during model loading or heavy extension operations. Unhealthy status is informational only and does not auto-restart the container.
+  </Description>
+  <Overview>
+  Image: ghcr.io/aegisnir/sd-webui-forge-neo-unraid:dev
+  The default Extra Parameters include --runtime=nvidia so Docker can expose the NVIDIA runtime inside the container.
+  Full setup and usage docs: https://github.com/aegisnir/sd-webui-forge-neo-unraid/blob/dev/README.md
+
+    This template passes Forge Neo data storage through --data-dir.
+
+    - Models, outputs, extensions, caches, and other working data are stored in the mapped data share instead of the container filesystem.
+    - Python, PyTorch and all WebUI dependencies are built into the image, so startup needs no downloads (extensions may still install their own packages).
+    - The data directory can grow very large very quickly, so I recommend storing it outside of appdata when possible.
+    - If startup fails with a Torch GPU check error, you can temporarily add --skip-torch-cuda-test to COMMANDLINE_ARGS for troubleshooting.
+    - If an extension breaks torch, delete /data/python-user on the host and restart. It holds only packages installed by extensions.
+    - WebUI login is enabled by default unless you explicitly set your own --gradio-auth or --gradio-auth-path in COMMANDLINE_ARGS.
+    - Container logs annotate known harmless warnings inline and display a [READY] box when the WebUI is accepting connections.
+    - A built-in Docker healthcheck monitors port 7860 with conservative timers to avoid false positives during heavy operations.
+  </Overview>
+  <Category>AI:</Category>
+  <WebUI>http://[IP]:[PORT:7860]</WebUI>
+  <Network>bridge</Network>
+  <Privileged>false</Privileged>
+  <Project>https://github.com/Haoming02/sd-webui-forge-classic/tree/neo</Project>
+  <Support>https://github.com/aegisnir/sd-webui-forge-neo-unraid</Support>
+  <Changelog>https://github.com/aegisnir/sd-webui-forge-neo-unraid/blob/dev/CHANGELOG.md</Changelog>
+  <TemplateURL>https://raw.githubusercontent.com/aegisnir/sd-webui-forge-neo-unraid/dev/template.xml</TemplateURL>
+  <!--
+    Changelog: Linked to the repo's CHANGELOG.md for update tracking.
+    Support: Points to the repo issues page for help.
+    TemplateURL: Always points to the latest template in dev.
+  -->
+  <Config Name="WebUI" Type="Port" Target="7860" Default="7860" Mode="tcp" Display="always" Required="true" Mask="false" Description="Port exposed by the Forge Neo WebUI (default: 7860)."/>
+  <Config Name="Config Directory" Type="Path" Target="/config" Default="/mnt/user/appdata/SD-WebUI-Forge-Neo-Unraid" Mode="rw" Display="always" Required="true" Mask="false" Description="Host path for auth files and WebUI settings (appdata). Kept separate from the large AI data share so it can be backed up with standard Unraid appdata backup tools. Default: /mnt/user/appdata/SD-WebUI-Forge-Neo-Unraid"/>
+  <Config Name="Data Directory" Type="Path" Target="/data" Default="/mnt/user/ai/data/" Mode="rw" Display="always" Required="true" Mask="false" Description="Host path mapped to --data-dir. Default: /mnt/user/ai/data/ (outside appdata)."/>
+  <Config Name="WebUI Auth File" Type="Variable" Target="WEBUI_AUTH_FILE" Default="/config/auth/webui-auth.txt" Display="always" Required="true" Mask="false" Description="Path inside the container to the WebUI auth file (recommended/default: /config/auth/webui-auth.txt). If the file is missing on first launch, startup seeds it from the repository default template. Default seeded login is admin:changeme. Format: username:password per line, or comma-separated entries on one line. Blank lines and # comments are ignored. For security, change the default password after first login."/>
+  <Config Name="API Auth File Mode" Type="Variable" Target="API_AUTH_FILE_MODE" Default="disabled" Display="advanced" Required="false" Mask="false" Description="Controls API authentication when WEBUI_AUTH_FILE is set and API is enabled via --api. 'mirror-webui-file' mirrors the auth file into --api-auth. 'disabled' (default) leaves API auth unset unless you pass your own --api-auth in COMMANDLINE_ARGS."/>
+  <Config Name="UMASK" Type="Variable" Target="UMASK" Default="" Display="advanced" Required="false" Mask="false" Description="Optional file creation mask (octal), for example 0027. Leave empty to keep the container default behavior and easier host-side access."/>
+  <Config Name="Extra Args" Type="Variable" Target="COMMANDLINE_ARGS" Default="--listen --port 7860 --data-dir /data" Display="advanced" Required="false" Mask="false" Description="Extra arguments for launch.py. Default: --listen --port 7860 --data-dir /data. Forge Neo stops on unknown flags, so check its README before adding any. To manage extensions from the WebUI, add --enable-insecure-extension-access (anyone who can log in can then run code in the container). API is disabled by default; add --api only if you explicitly need it. No attention package is installed: Neo uses PyTorch's built-in attention. Adding --xformers or --sage installs that package into /data/python-user on next start. For GPU errors, try adding --skip-torch-cuda-test temporarily."/>
+</Container>

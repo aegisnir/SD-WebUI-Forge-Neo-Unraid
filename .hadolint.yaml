@@ -1,0 +1,10 @@
+# Hadolint configuration for this Dockerfile.
+# Rules are suppressed here only when they conflict with intentional design
+# decisions or are impractical for this class of image. Each suppression
+# includes an explanation.
+
+# Only Dockerfile errors (not warnings) fail the build. This is intentional:
+# DL3008 (apt version pins) is the only warning produced by this Dockerfile
+# and is explicitly accepted via the action's ignore: input in ci.yml.
+# New errors will still fail CI.
+failure-threshold: error

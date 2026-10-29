@@ -1,0 +1,141 @@
+name: Build Image
+
+# Builds the image on GitHub-hosted runners and publishes it to GHCR.
+#
+# Flow (fail-closed):
+#   1. Build and push ghcr.io/aegisnir/sd-webui-forge-neo-unraid:sha-<short sha>,
+#      with SBOM and provenance attestations.
+#   2. Scan that exact image with Trivy. Any fixable HIGH/CRITICAL CVE stops
+#      the workflow here.
+#   3. Only then point the channel tag at it:
+#        push to dev   -> :dev
+#        push to main  -> :latest
+#        tag vX.Y.Z    -> :vX.Y.Z
+#      The sha- tag stays as a rollback point either way.
+#
+# Authentication uses the workflow's built-in GITHUB_TOKEN (no personal access
+# token). The token only exists for the length of the job.
+#
+# Note: GHCR creates new packages as private. After the first run, set the
+# package to public once (Package settings -> Change visibility) so Unraid can
+# pull it without logging in.
+#
+# All third-party Actions are pinned to immutable full commit SHAs.
+# See ci.yml header for the rationale (GHSA-69fq-xp46-6x23 / CVE-2026-33634).
+
+on:
+  push:
+    branches: ["dev", "main"]
+    tags: ["v*.*.*"]
+    paths-ignore:
+      - "**.md"
+      - "LICENSES/**"
+      - ".github/ISSUE_TEMPLATE/**"
+      - ".github/PULL_REQUEST_TEMPLATE.md"
+  workflow_dispatch:
+
+# One build per ref at a time; a newer push cancels an older running build.
+concurrency:
+  group: build-image-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: ghcr.io/aegisnir/sd-webui-forge-neo-unraid
+
+jobs:
+  build:
+    name: Build, scan, publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Free runner disk space
+        # A standard runner has about 14 GB free, too little for a CUDA +
+        # PyTorch image. Removing preinstalled SDKs this image never uses
+        # frees roughly 30 GB more. Plain rm, so no extra third-party Action.
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          sudo docker image prune --all --force > /dev/null
+          df -h /
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.0
+
+      - name: Work out tags and version
+        id: meta
+        run: |
+          short_sha="${GITHUB_SHA::7}"
+          case "${GITHUB_REF}" in
+            refs/heads/dev)  channel="dev" ;;
+            refs/heads/main) channel="latest" ;;
+            refs/tags/v*)    channel="${GITHUB_REF_NAME}" ;;
+            *)               channel="" ;;
+          esac
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            version="${GITHUB_REF_NAME}"
+          else
+            version="${GITHUB_REF_NAME}-${short_sha}"
+          fi
+          {
+            echo "build_tag=${IMAGE}:sha-${short_sha}"
+            echo "channel_tag=${channel:+${IMAGE}:${channel}}"
+            echo "version=${version}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to GHCR
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push (sha tag only)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.build_tag }}
+          build-args: |
+            IMAGE_VERSION=${{ steps.meta.outputs.version }}
+          sbom: true
+          provenance: mode=max
+
+      - name: Scan the pushed image (Trivy)
+        # Fails the workflow on any fixable HIGH/CRITICAL CVE, so the channel
+        # tag below is never moved to an image that failed the scan.
+        # Accepted findings go in .trivyignore with a reason.
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # 0.36.0
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          TRIVY_TIMEOUT: 30m
+        with:
+          image-ref: ${{ steps.meta.outputs.build_tag }}
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          trivyignores: .trivyignore
+
+      - name: Publish channel tag
+        if: steps.meta.outputs.channel_tag != ''
+        # Copies the scanned image's manifest list (including attestations)
+        # to the channel tag. No rebuild, so it is the exact image Trivy saw.
+        env:
+          BUILD_TAG: ${{ steps.meta.outputs.build_tag }}
+          CHANNEL_TAG: ${{ steps.meta.outputs.channel_tag }}
+        run: |
+          docker buildx imagetools create --tag "${CHANNEL_TAG}" "${BUILD_TAG}"
+          docker buildx imagetools inspect "${CHANNEL_TAG}"

@@ -1,0 +1,21 @@
+# yamllint configuration for this repository.
+# Extends the default ruleset but relaxes rules that are impractical for
+# GitHub Actions workflow files without providing meaningful safety value.
+
+extends: default
+
+rules:
+  # GitHub Actions workflows often contain long run: commands (e.g. multi-
+  # package apt-get installs). 120 chars is a reasonable practical limit.
+  line-length:
+    max: 120
+    level: warning
+
+  # '---' document-start markers are conventional in some YAML styles but are
+  # not used in GitHub Actions workflows and are not required here.
+  document-start: disable
+
+  # GitHub Actions uses both 'true'/'false' and 'yes'/'no' as boolean values.
+  truthy:
+    allowed-values: ["true", "false", "yes", "no"]
+    check-keys: false

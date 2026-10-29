@@ -1,0 +1,42 @@
+name: Trivy Image Scan
+
+# Weekly CVE scan of the published :dev image.
+# Catches newly disclosed vulnerabilities in OS packages and Python dependencies
+# that a source-only scan cannot see. Also useful to run manually before tagging
+# a release.
+#
+# Only fixable HIGH/CRITICAL CVEs are reported (ignore-unfixed: true) to avoid
+# constant noise from base-image CVEs that have no upstream fix yet.
+#
+# exit-code is 0 (informational) because this workflow scans an already-published
+# image, not a pending code change. A finding here means you should rebuild the
+# image with an updated base or patched packages, then re-run to confirm the fix.
+#
+# All third-party Actions are pinned to immutable full commit SHAs.
+# See ci.yml header for the rationale (GHSA-69fq-xp46-6x23 / CVE-2026-33634).
+
+on:
+    schedule:
+        - cron: "0 6 * * 1" # Every Monday at 06:00 UTC
+    workflow_dispatch: # Allow manual runs from the Actions tab
+
+permissions:
+    contents: read
+
+jobs:
+    scan:
+        name: CVE Scan (ghcr.io/:dev)
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.0
+
+            - name: Scan image for CVEs
+              uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # 0.36.0
+              with:
+                  image-ref: ghcr.io/aegisnir/sd-webui-forge-neo-unraid:dev
+                  format: table
+                  severity: HIGH,CRITICAL
+                  ignore-unfixed: true
+                  exit-code: "0"

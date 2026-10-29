@@ -1,0 +1,34 @@
+# Git metadata
+.git
+.gitignore
+
+# GitHub config
+.github
+
+# Documentation (not needed in image)
+README.md
+SECURITY.md
+CHANGELOG.md
+CONTRIBUTING.md
+VERSIONING.md
+STATUS.md
+
+# Scripts (dev-only, not shipped in image)
+scripts/
+
+# Icon (referenced by URL, not bundled)
+icon.png
+
+# Editor / OS junk
+.DS_Store
+Thumbs.db
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build artifacts
+build/
+dist/

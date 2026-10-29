@@ -1,0 +1,11 @@
+# Trivy misconfiguration findings accepted for this project.
+# Each entry includes an explanation of why the finding is acceptable here.
+
+# DS002: Image should not be run as root.
+# This Dockerfile intentionally starts as root so that entrypoint.sh can
+# self-heal /data directory ownership at container startup — the same pattern
+# used by PostgreSQL, Redis, Nginx, and many other production container images.
+# Privileges are immediately dropped to UID 99 (nobody/users) via `setpriv`
+# before exec-ing start.sh. Runtime hardening is applied at the Docker level
+# via template.xml: --cap-drop=ALL, --security-opt no-new-privileges:true, etc.
+DS002

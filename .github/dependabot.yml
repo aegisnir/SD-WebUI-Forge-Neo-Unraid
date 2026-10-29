@@ -1,0 +1,20 @@
+version: 2
+
+updates:
+  # Keep GitHub Actions versions current. Covers actions/checkout,
+  # hadolint/hadolint-action, aquasecurity/trivy-action, gitleaks/gitleaks-action,
+  # and any other actions added in .github/workflows/.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  # Monitor the CUDA base image for digest updates. A new digest indicates that
+  # the upstream image received OS security patches. Review the changes and update
+  # the pinned digest in the Dockerfile when Dependabot opens a PR.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3

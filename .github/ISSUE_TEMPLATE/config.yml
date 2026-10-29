@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Discussions
+    url: https://github.com/aegisnir/sd-webui-forge-neo-unraid/discussions
+    about: Ask questions, share ideas, or get help from the community.
+  - name: Forge Neo Upstream Issues
+    url: https://github.com/Haoming02/sd-webui-forge-classic/issues
+    about: For bugs or feature requests related to the WebUI itself (not this container).

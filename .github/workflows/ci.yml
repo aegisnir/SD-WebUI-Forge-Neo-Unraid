@@ -1,0 +1,111 @@
+name: CI
+
+# Runs on every push and pull request to dev or main.
+# The security baseline script (scripts/security-check.sh) is the single
+# source of truth for the container security gates: bash syntax, shellcheck,
+# XML parse, and the 29 security baseline checks.
+#
+# Additional static analysis steps in this workflow:
+#   hadolint  -- Dockerfile best-practices lint (.hadolint.yaml for suppressions)
+#   bandit    -- Python security scan of WebUI/launch.py (medium+ severity only)
+#   yamllint  -- YAML syntax/style for .github/ files (.yamllint.yml for config)
+#   trivy     -- Dockerfile misconfiguration scan (.trivyignore for suppressions)
+#   gitleaks  -- Secret detection across git history (.gitleaks.toml for allowlist)
+#
+# All third-party Actions are pinned to immutable full commit SHAs.
+# Mutable version tags can be force-pushed by a compromised maintainer
+# (as happened with trivy-action in the March 2026 supply chain attack,
+# GHSA-69fq-xp46-6x23 / CVE-2026-33634). SHA pinning prevents that class
+# of attack. Dependabot will still propose SHA updates when new releases
+# ship. The human-readable version tag is noted in a comment on each line.
+
+on:
+  push:
+    branches: ["dev", "main"]
+  pull_request:
+    branches: ["dev", "main"]
+
+# Minimal permissions -- this workflow only reads repository contents.
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Lint & Security Baseline
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.0
+        with:
+          # Full history is required for gitleaks to scan commits for secrets.
+          # A shallow clone would miss secrets that were added and later deleted.
+          fetch-depth: 0
+
+      - name: Install shellcheck
+        # shellcheck is not pre-installed on ubuntu-latest. The security
+        # baseline script calls it internally, so it must be present first.
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends shellcheck
+
+      - name: Security baseline checks
+        # Runs all 26 automated checks and exits non-zero on any failure.
+        # Output includes a per-check [PASS]/[FAIL] summary and a final count.
+        run: bash scripts/security-check.sh
+
+      - name: Lint Dockerfile (hadolint)
+        # Catches Dockerfile anti-patterns: unpinned base-image tags, missing
+        # --no-install-recommends, insecure shell options, layer ordering, etc.
+        # Suppressed rules are documented in .hadolint.yaml.
+        # failure-threshold: error -- DL3008 (apt version pins) is accepted as a
+        # warning; only ERROR-level findings redden this step. The config file
+        # also sets this threshold but the action is more reliably picked up here.
+        # NOTE: v3.3.0 bundles hadolint v2.14.0 which has the ignore-key config
+        # regression. DL3008 is suppressed via the action's ignore: input below,
+        # not via .hadolint.yaml, so this does not affect us.
+        uses: hadolint/hadolint-action@2332a7b74a6de0dda2e2221d575162eba76ba5e5 # v3.3.0
+        with:
+          dockerfile: Dockerfile
+          failure-threshold: error
+          # DL3008: Pin versions in apt-get install.
+          # Suppressed: apt version strings are distro-specific and volatile.
+          # The CUDA base image is pinned by digest; stale packages are
+          # mitigated by periodic base-image rebuilds, not apt version pins.
+          ignore: DL3008
+
+      - name: Python security scan (bandit)
+        # Scans WebUI/launch.py for common Python security issues (unsafe
+        # subprocess calls, insecure temp files, injection risks, etc.).
+        # -ll: report only medium and high severity findings to reduce noise.
+        run: |
+          pip install --quiet "bandit==1.8.3"
+          bandit -r WebUI/ -ll
+
+      - name: YAML lint (.github/)
+        # Validates syntax and style for all workflow files and dependabot.yml.
+        # Style overrides are in .yamllint.yml (relaxes impractical defaults).
+        run: |
+          pip install --quiet "yamllint==1.35.1"
+          yamllint .github/
+
+      - name: Trivy config scan
+        # Scans Dockerfile and other config files for known misconfigurations
+        # without requiring a built image. Accepted findings with explanatory
+        # comments are listed in .trivyignore.
+        # Pinned to 0.35.0: the first version protected by GitHub immutable
+        # releases and unaffected by the March 2026 supply chain attack
+        # (GHSA-69fq-xp46-6x23 / CVE-2026-33634).
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # 0.36.0
+        with:
+          scan-type: config
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          trivyignores: .trivyignore
+
+      - name: Secret scan (gitleaks)
+        # Scans git history and the working tree for accidentally committed
+        # secrets. webui-auth.txt is an intentional default-credentials
+        # placeholder and is allowlisted in .gitleaks.toml.
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

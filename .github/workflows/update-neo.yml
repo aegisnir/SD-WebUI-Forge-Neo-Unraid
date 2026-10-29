@@ -1,0 +1,94 @@
+name: Check for Forge Neo release
+
+# Daily check for a new Forge Neo release tag. When one appears, opens a PR
+# against dev that bumps WEBUI_TAG and WEBUI_REF in the Dockerfile.
+# Merging that PR triggers build-image.yml. Nothing is built or published here.
+#
+# Only release tags are tracked, never daily commits between releases.
+# Dependabot can't do this: it does not track a git SHA in a build arg.
+#
+# One-time repo setting this needs:
+#   Settings -> Actions -> General -> Workflow permissions ->
+#   "Allow GitHub Actions to create and approve pull requests"
+#
+# Known limitation: a PR opened with GITHUB_TOKEN does not trigger other
+# workflows, so CI does not run on it automatically. Close and reopen the PR
+# to run CI before merging.
+#
+# All third-party Actions are pinned to immutable full commit SHAs.
+# See ci.yml header for the rationale (GHSA-69fq-xp46-6x23 / CVE-2026-33634).
+
+on:
+  schedule:
+    - cron: "0 7 * * *" # Every day at 07:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Compare pinned tag with latest release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout dev
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.0
+        with:
+          ref: dev
+
+      - name: Look up the latest Neo release tag
+        id: neo
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          repo="Haoming02/sd-webui-forge-classic"
+          # Tags are listed newest first. Neo tags releases as N.N or N.N.N.
+          tag="$(gh api "repos/${repo}/tags?per_page=20" --jq '.[].name' \
+            | grep -E '^[0-9]+\.[0-9]+(\.[0-9]+)?$' | head -n 1)"
+          # Resolve the tag to its commit (works for annotated tags too).
+          sha="$(gh api "repos/${repo}/commits/${tag}" --jq '.sha')"
+          # Both values end up in a file and a branch name: validate strictly.
+          [[ "${tag}" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || { echo "Unexpected tag: ${tag}"; exit 1; }
+          [[ "${sha}" =~ ^[0-9a-f]{40}$ ]] || { echo "Unexpected sha: ${sha}"; exit 1; }
+          current_tag="$(sed -n 's/^ARG WEBUI_TAG=//p' Dockerfile)"
+          echo "Pinned: ${current_tag}  Latest: ${tag} (${sha})"
+          {
+            echo "tag=${tag}"
+            echo "sha=${sha}"
+            echo "current_tag=${current_tag}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Open a PR for the new release
+        if: steps.neo.outputs.tag != steps.neo.outputs.current_tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.neo.outputs.tag }}
+          SHA: ${{ steps.neo.outputs.sha }}
+          CURRENT_TAG: ${{ steps.neo.outputs.current_tag }}
+        run: |
+          branch="neo-${TAG}"
+          if git ls-remote --exit-code --heads origin "${branch}" > /dev/null; then
+            echo "Branch ${branch} already exists; a PR is probably open. Nothing to do."
+            exit 0
+          fi
+          sed -i "s/^ARG WEBUI_TAG=.*/ARG WEBUI_TAG=${TAG}/; s/^ARG WEBUI_REF=.*/ARG WEBUI_REF=${SHA}/" Dockerfile
+          git diff --exit-code --quiet Dockerfile && { echo "Dockerfile unchanged"; exit 1; }
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "${branch}"
+          git commit -am "build: bump Forge Neo to ${TAG}"
+          git push origin "${branch}"
+          gh pr create --base dev --head "${branch}" \
+            --title "build: bump Forge Neo to ${TAG}" \
+            --body "Forge Neo tagged release ${TAG} (commit ${SHA}). Pinned until now: ${CURRENT_TAG}.
+
+          Before merging:
+          - Read the release notes: https://github.com/Haoming02/sd-webui-forge-classic/releases/tag/${TAG}
+          - Check whether Neo changed its torch, gradio or requirements pins (modules/launch_utils.py, requirements.txt). If so, update the matching ARGs in the Dockerfile in this PR.
+          - Close and reopen this PR so CI runs.
+
+          Merging builds and publishes :dev."
