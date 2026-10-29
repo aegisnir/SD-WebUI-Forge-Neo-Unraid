@@ -7,6 +7,10 @@ I am keeping this intentionally lightweight. This is a personal, AI-assisted hob
 
 ## [Unreleased]
 
+### Added (template)
+
+- `APP_UID` / `APP_GID` settings in the Unraid template (advanced view), defaulting to `99` / `100`. The entrypoint now rejects non-numeric values as well as `0`.
+
 ### Rebased on Forge Neo (breaking)
 
 AUTOMATIC1111 has had no commits since 2026-03-02 and has four unpatched CVEs (2026-10-18),

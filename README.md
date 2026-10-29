@@ -761,6 +761,8 @@ chmod 775 <data-path>
 | `WEBUI_LOGIN_LOCKOUT_MINUTES` | `15` | How long a lockout lasts (also the window failures are counted in) |
 | `PYTHONUSERBASE` | `/data/python-user` | Where packages installed by extensions go |
 | `WEBUI_HOST_IP` | *(unset)* | Address shown in the `[READY]` log banner, and added to the self-signed certificate. Set it to your Unraid IP in bridge mode, where the container can't see it. It does not change where the WebUI listens. |
+| `APP_UID` | `99` | User ID the WebUI runs as (Unraid's `nobody`). On first start, `/data` and `/config` are re-owned to this user. Must not be `0`. Values other than the default are not tested. |
+| `APP_GID` | `100` | Group ID the WebUI runs as (Unraid's `users`). Same rules as `APP_UID`. |
 | `UMASK` | *(unset)* | Override default umask for all file creation (e.g., `022`) |
 | `NO_COLOR` | *(unset)* | Set to `1` to suppress ANSI color codes in container logs |
 | `TERM` | *(unset)* | Set to `dumb` to suppress ANSI color codes (alternative to `NO_COLOR`) |
@@ -779,7 +781,7 @@ This is a new project. The old AUTOMATIC1111 container ([aegisnir/A1111-unraid](
 
 ### Coming from another Forge Neo container
 
-Your `config.json` already has Neo's version marker, so settings carry over. The entrypoint changes `/data` ownership to `99:100` on first start. If the old container ran as another user, test with a **copy** of the data first, because the old container may not be able to write to it afterwards.
+Your `config.json` already has Neo's version marker, so settings carry over. The entrypoint changes `/data` ownership to `99:100` on first start. If the old container ran as another user, test with a **copy** of the data first, because the old container may not be able to write to it afterwards. To keep the old owner instead, set `APP_UID` and `APP_GID` to match it before the first start.
 
 ### Extension management is on by default
 

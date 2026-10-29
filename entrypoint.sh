@@ -47,7 +47,11 @@ DATA_DIR="/data"
 EXPECTED_UID="${APP_UID:-99}"
 EXPECTED_GID="${APP_GID:-100}"
 
-if [[ "${EXPECTED_UID}" == "0" || "${EXPECTED_GID}" == "0" ]]; then
+if [[ ! "${EXPECTED_UID}" =~ ^[0-9]+$ || ! "${EXPECTED_GID}" =~ ^[0-9]+$ ]]; then
+  echo "${C_CRIT}${C_BOLD}FATAL:${C_RESET}${C_CRIT} APP_UID/APP_GID must be numbers (got '${EXPECTED_UID}':'${EXPECTED_GID}').${C_RESET}" >&2
+  exit 1
+fi
+if (( 10#${EXPECTED_UID} == 0 || 10#${EXPECTED_GID} == 0 )); then
   echo "${C_CRIT}${C_BOLD}FATAL:${C_RESET}${C_CRIT} APP_UID/APP_GID must not be 0. Refusing to run as root.${C_RESET}" >&2
   exit 1
 fi
