@@ -203,6 +203,8 @@ The image pins Python packages to the versions Forge Neo installs. Neo's built-i
 
 The full, user-facing list, including every Gradio CVE, is in the README section [Known security issues](README.md#known-security-issues). Keep the two in sync.
 
+**Other Python packages.** The first image scan found 21 HIGH findings outside Gradio. GitPython, diffusers and setuptools are upgraded in the image (10 fixed; versions asserted in the Dockerfile). The other 11 are accepted in `.trivyignore` with reasons; see the README.
+
 **Gradio 4 (biggest risk).** Forge Neo 2.31 pins Gradio 4.40.0, which has 28 published vulnerabilities (1 critical). Most are fixed only in Gradio 5/6, which Neo does not support. This image upgrades to Gradio 4.44.1, fixing 5 of them; this is untested upstream and may break parts of the UI (`GRADIO_VERSION` build argument to roll back). The remaining 23 are accepted in `.trivyignore`, each with a reason and a 2027-01-31 expiry that forces a re-review.
 
 These were found during the 2026-10-28 review of Forge Neo 2.31 and are not fixed by this container:

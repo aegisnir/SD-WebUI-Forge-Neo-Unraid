@@ -38,6 +38,7 @@ I built this container for my own Unraid server and the way I use it, then share
 |---|---|---|---|
 | Installing extensions from the WebUI is **on** | I install extensions from the WebUI | Anyone who can log in can run code in the container | Remove `--enable-insecure-extension-access` from Extra Args ([details](#extension-management-is-on-by-default)) |
 | Gradio **4.44.1** instead of Forge Neo's 4.40.0 | Fixes 5 known vulnerabilities | Not tested by Forge Neo; parts of the UI may break | [Build with Gradio 4.40.0](#build-with-the-original-gradio-4400) |
+| Newer **GitPython, diffusers and setuptools** than Forge Neo pins | Fixes 10 high-rated vulnerabilities | Not tested by Forge Neo; may break | Build with `--build-arg GITPYTHON_VERSION=3.1.62` (and `DIFFUSERS_VERSION`, `SETUPTOOLS_VERSION`), the same way as [the Gradio build](#build-with-the-original-gradio-4400) |
 | A starter login `admin` / `changeme` is created and the WebUI still starts | The WebUI is never without a login, and first setup stays simple | Weak until you change it | Change the password in the auth file ([details](#authentication-defaults)) |
 | HTTPS with a **self-signed** certificate | Encryption on my network without extra setup | Your browser warns once | Use your own certificate, or `WEBUI_TLS=off` ([details](#https--tls)) |
 | Login lockout after **5** failed attempts for **15** minutes | Slows down password guessing | Typos can lock you out for a while | `WEBUI_LOGIN_MAX_ATTEMPTS`, `WEBUI_LOGIN_LOCKOUT_MINUTES` ([details](#login-protection)) |
@@ -123,6 +124,31 @@ Forge Neo 2.31 pins **Gradio 4.40.0**, the web framework that draws the whole UI
 | Low | [GHSA-26jh-r8g2-6fpr](https://osv.dev/vulnerability/GHSA-26jh-r8g2-6fpr) | Drop-down menus accept values that are not in the list if someone sends a hand-made request. | **Yes, minor.** At worst, a setting gets an unexpected value. | 5.0.0 |
 
 Source: [OSV](https://osv.dev/list?ecosystem=PyPI&q=gradio), package `gradio`, version 4.44.1. Plain-English summaries are mine; follow each link for the official description.
+
+### Other packages flagged by the image scan
+
+The build scans the finished image with [Trivy](https://trivy.dev/). Besides Gradio, its first scan found 21 high-rated issues in Python packages that Forge Neo pins. None were critical, and the operating system layer had none.
+
+**Fixed in this image (10)** by upgrading past Forge Neo's pinned versions. This is a mitigation attempt (maintainer's choice) that Forge Neo does not test, so it may break things:
+
+| Package | Forge Neo pins | This image | What it fixes, in plain English |
+|---|---|---|---|
+| GitPython | 3.1.62 | 3.2.1 | 5 issues, including running code or reading files through a malicious git repository. This matters here because the WebUI installs extensions from git repositories, and extension installs are on by default. |
+| setuptools | 78.1.0 | 81.0.0 | 3 issues (in setuptools and two helpers it bundles) that only matter while packages are being installed. 81.0.0 is the newest release that still includes `pkg_resources`, which a Forge Neo built-in preprocessor needs. |
+| diffusers | 0.37.1 | 0.38.0 | 2 issues where a downloaded model could run its own code even when that is supposed to be blocked. |
+
+**Accepted (11)** because the fix needs a major new version that Forge Neo does not support, or because no fixed release exists yet:
+
+| Package | ID | What it means | Does it affect this container? |
+|---|---|---|---|
+| transformers 4.57.6 | [CVE-2026-4372](https://osv.dev/vulnerability/CVE-2026-4372), [CVE-2026-5241](https://osv.dev/vulnerability/CVE-2026-5241) | Loading a model from Hugging Face that ships its own code could run that code, even with the safety switch off. Fixed only in transformers 5.x. | **Low.** Forge Neo loads model files you put in `/data`; it does not normally download models with custom code. Only add models from sources you trust. |
+| transformers 4.57.6 | [CVE-2026-9856](https://osv.dev/vulnerability/CVE-2026-9856) | Saving a model with a crafted template name can write files outside the intended folder. | **Low.** Forge Neo does not save models through this function in normal use. |
+| protobuf 4.25.9 | [CVE-2026-0994](https://osv.dev/vulnerability/CVE-2026-0994) | A crafted data file can crash the reader with deep nesting. Fixed only in protobuf 5.x/6.x. | **Low.** Only when a crafted file is loaded, for example through an untrusted model or extension. A crash is restarted automatically. |
+| starlette 0.50.0 | [CVE-2026-48818](https://osv.dev/vulnerability/CVE-2026-48818) | On Windows, a crafted path can make the server reach out to another machine. | **No.** Windows only. |
+| starlette 0.50.0 | [CVE-2026-54283](https://osv.dev/vulnerability/CVE-2026-54283) | Size limits are skipped for one kind of form, so a huge form can tie up memory. Fixed only in starlette 1.x, which needs a newer FastAPI than Forge Neo and Gradio 4 support. | **Yes, possibly.** The login form is that kind of form, so someone who can reach the WebUI could try it before logging in. A DoS, not a break-in. Keeping it off the internet lowers this a lot. |
+| msgpack 1.1.2, urllib3 2.7.0, setuptools 70.3.0 (bundled inside pip) | [CVE-2026-114613](https://osv.dev/vulnerability/CVE-2026-114613), [GHSA-6v7p-g79w-8964](https://osv.dev/vulnerability/GHSA-6v7p-g79w-8964), [CVE-2026-97687](https://osv.dev/vulnerability/CVE-2026-97687), [CVE-2026-97689](https://osv.dev/vulnerability/CVE-2026-97689), [CVE-2025-47273](https://osv.dev/vulnerability/CVE-2025-47273) | Memory and crash issues, a proxy setting override, and a path issue in old copies that pip carries inside itself. pip 26.2.2 is the newest pip, so there is no update yet. | **Low.** These copies only run while pip installs packages for an extension. The WebUI's own urllib3 and setuptools are already the fixed versions (the build checks this). |
+
+Each accepted item is listed in [`.trivyignore`](.trivyignore) with its reason and the same 2027-01-31 expiry.
 
 ### Forge Neo issues (not Gradio)
 

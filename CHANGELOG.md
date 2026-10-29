@@ -57,6 +57,11 @@ release 2.31. Container hardening, auth handling, log redaction and the restart 
   Gradio's launch() in `WebUI/launch.py`; Forge Neo's files are unchanged. Restart clears lockouts
 - **README**: "Built for my setup" table of maintainer's-choice defaults with trade-offs, and a
   callout at each; explicit warning that Extensions → Available is the A1111 list
+- **Python package upgrades** (security mitigation, may break): GitPython 3.1.62 → 3.2.1,
+  diffusers 0.37.1 → 0.38.0, setuptools 78.1.0 → 81.0.0 (last release with `pkg_resources`),
+  fixing 10 HIGH findings from the first image scan; the build asserts these versions and that
+  urllib3 ≥ 2.8.0. 11 more HIGH findings (transformers, protobuf, starlette, pip-vendored
+  msgpack/urllib3/setuptools) are accepted in `.trivyignore` and explained in the README
 - **Build fix**: gradio and Neo's requirements are installed in two steps, as Neo does, because
   gradio declares `Pillow<11` while Neo pins Pillow 13
 

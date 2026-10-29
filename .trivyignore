@@ -73,3 +73,39 @@ CVE-2026-10783 exp:2027-01-31
 CVE-2026-27167 exp:2027-01-31
 # gradio Low, fixed in: 5.0.0. Gradio's dropdown component pre-process step does not limit the values to those in the dropdown list
 GHSA-26jh-r8g2-6fpr exp:2027-01-31
+
+# ------------------------------------------------------------------------------
+# Other Python packages: accepted known vulnerabilities (reviewed 2026-10-29)
+#
+# Found by the first image scan (build of sha-7d0c751). Fixing these needs a
+# major version Forge Neo does not support, or there is no newer release.
+# Listed with their impact in README.md, "Known security issues". Same expiry
+# rule as above. (GitPython, diffusers and setuptools were upgraded instead.)
+# ------------------------------------------------------------------------------
+# transformers 4.57.6 (Neo pin), fix needs 5.x. Remote code execution when loading a Hub model with remote code.
+CVE-2026-4372 exp:2027-01-31
+# transformers 4.57.6, fix 5.5.0. trust_remote_code setting can be overridden.
+CVE-2026-5241 exp:2027-01-31
+# transformers 4.57.6, fix 5.10.0. save_pretrained path traversal via chat template names.
+CVE-2026-9856 exp:2027-01-31
+# protobuf 4.25.9 (Neo pin), fix needs 5.29.6/6.33.5. Denial of service via deep recursion.
+CVE-2026-0994 exp:2027-01-31
+# starlette 0.50.0, fix needs 1.x (blocked by FastAPI 0.127 / Gradio 4). Windows-only UNC path SSRF.
+CVE-2026-48818 exp:2027-01-31
+# starlette 0.50.0, fix 1.3.1. Form size limits ignored for urlencoded forms (DoS).
+CVE-2026-54283 exp:2027-01-31
+# The next five are copies vendored INSIDE pip 26.2.2 (the newest pip; see pip's
+# _vendor/vendor.txt). They only run while pip installs extension packages.
+# The image's own urllib3 is >= 2.8.0 (fixed); the Dockerfile asserts that, so
+# these entries cannot hide a vulnerable top-level urllib3.
+# pip-vendored msgpack 1.1.2, fix 1.2.3. Memory leak DoS during map deserialization.
+CVE-2026-114613 exp:2027-01-31
+# pip-vendored msgpack 1.1.2, fix 1.2.1. Out-of-bounds read on Unpacker reuse.
+GHSA-6v7p-g79w-8964 exp:2027-01-31
+# pip-vendored urllib3 2.7.0, fix 2.8.0. HTTPS proxy TLS configuration override.
+CVE-2026-97687 exp:2027-01-31
+# pip-vendored urllib3 2.7.0, fix 2.8.0. Unbounded memory in chunk parser (DoS).
+CVE-2026-97689 exp:2027-01-31
+# pip-vendored setuptools 70.3.0 (pkg_resources), fix 78.1.1. PackageIndex path traversal.
+# The image's own setuptools is 81.0.0 (asserted in the Dockerfile).
+CVE-2025-47273 exp:2027-01-31

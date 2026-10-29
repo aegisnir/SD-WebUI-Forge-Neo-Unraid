@@ -102,6 +102,17 @@ ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cu130
 # are listed in README.md ("Known security issues") and .trivyignore.
 ARG GRADIO_VERSION=4.44.1
 ARG GRADIO_RANGESLIDER_VERSION=0.0.8
+
+# SECURITY MITIGATION, MAY BREAK: newer than the versions Neo 2.31 pins, to fix
+# HIGH vulnerabilities found by the image scan (see README "Known security issues"):
+#   GitPython 3.1.62 -> 3.2.1   (5 issues; Neo uses it to install extensions)
+#   diffusers 0.37.1 -> 0.38.0  (2 issues; remote-code loading bypass)
+#   setuptools 78.1.0 -> 81.0.0 (3 issues incl. its bundled jaraco.context and wheel).
+#     81 is the last release that still ships pkg_resources, which Neo's built-in
+#     oneformer (detectron2) preprocessor imports. Do not go to 82+ without checking.
+ARG GITPYTHON_VERSION=3.2.1
+ARG DIFFUSERS_VERSION=0.38.0
+ARG SETUPTOOLS_VERSION=81.0.0
 ARG PACKAGING_VERSION=26.3
 ARG PIP_VERSION=26.2.2
 
@@ -251,12 +262,21 @@ WORKDIR ${WEBUI_DIR}
 RUN python3 -m pip install --no-cache-dir --prefer-binary \
   "gradio==${GRADIO_VERSION}" "gradio_rangeslider==${GRADIO_RANGESLIDER_VERSION}" \
   && python3 -m pip install --no-cache-dir --prefer-binary -r requirements.txt \
+  && python3 -m pip install --no-cache-dir --prefer-binary \
+  "GitPython==${GITPYTHON_VERSION}" "diffusers==${DIFFUSERS_VERSION}" "setuptools==${SETUPTOOLS_VERSION}" \
   && mkdir -p /tmp/neo-build \
   && COMMANDLINE_ARGS="" python3 launch.py --skip-torch-cuda-test --skip-python-version-check \
   --data-dir /tmp/neo-build --exit \
   && rm -rf /tmp/neo-build "${WEBUI_DIR}/tmp" /root/.cache \
   && { python3 -m compileall -q "${WEBUI_DIR}" > /dev/null || true; } \
-  && GRADIO_VERSION="${GRADIO_VERSION}" python3 -c "import os, torch, torchvision, gradio; \
+  && GRADIO_VERSION="${GRADIO_VERSION}" GITPYTHON_VERSION="${GITPYTHON_VERSION}" \
+  DIFFUSERS_VERSION="${DIFFUSERS_VERSION}" SETUPTOOLS_VERSION="${SETUPTOOLS_VERSION}" \
+  python3 -c "import os, importlib.metadata as m, torch, torchvision, gradio; \
+assert m.version('GitPython') == os.environ['GITPYTHON_VERSION'], m.version('GitPython'); \
+assert m.version('diffusers') == os.environ['DIFFUSERS_VERSION'], m.version('diffusers'); \
+assert m.version('setuptools') == os.environ['SETUPTOOLS_VERSION'], m.version('setuptools'); \
+assert tuple(int(x) for x in m.version('urllib3').split('.')[:2]) >= (2, 8), 'urllib3 ' + m.version('urllib3'); \
+import pkg_resources; \
 assert torch.__version__ == os.environ['TORCH_VERSION'], torch.__version__; \
 assert torchvision.__version__ == os.environ['TORCHVISION_VERSION'], torchvision.__version__; \
 assert gradio.__version__ == os.environ['GRADIO_VERSION'], gradio.__version__; \
