@@ -52,6 +52,11 @@ release 2.31. Container hardening, auth handling, log redaction and the restart 
 - **README**: plain-English impact for every gradio CVE (checked against Neo 2.31's use of each
   Gradio feature), extension guidance for Forge Neo, CivitAI extension status, `<data-path>`
   placeholder, how to build with gradio 4.40.0, why the restart loop exists
+- **Login protection**: failed logins wait 1 s; 5 failures lock that username for 15 minutes
+  (`WEBUI_LOGIN_MAX_ATTEMPTS`, `WEBUI_LOGIN_LOCKOUT_MINUTES`; 0 disables). Implemented by wrapping
+  Gradio's launch() in `WebUI/launch.py`; Forge Neo's files are unchanged. Restart clears lockouts
+- **README**: "Built for my setup" table of maintainer's-choice defaults with trade-offs, and a
+  callout at each; explicit warning that Extensions → Available is the A1111 list
 - **Build fix**: gradio and Neo's requirements are installed in two steps, as Neo does, because
   gradio declares `Pillow<11` while Neo pins Pillow 13
 

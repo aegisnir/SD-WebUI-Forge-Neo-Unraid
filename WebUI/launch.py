@@ -2,7 +2,7 @@
 launch.py -- Custom wrapper for Forge Neo's launch.py.
 
 This file replaces the upstream launch.py inside the Docker image. It mirrors
-upstream's main() step for step, with two container-specific changes:
+upstream's main() step for step, with three container-specific changes:
 
   1. Log redaction: sensitive CLI arguments (auth credentials and auth file
      paths) are never printed in plain text to the container log.
@@ -12,6 +12,10 @@ upstream's main() step for step, with two container-specific changes:
      settings files, starts fresh and logs what it did. Only if that fails
      does it exit with EXIT_CONFIG, which start.sh treats as fatal instead
      of restarting in a loop.
+  3. Login protection: Gradio's login has no limit on attempts. Before the
+     WebUI starts, Gradio's launch() is wrapped so the username/password list
+     Forge Neo passes becomes a checker that locks a username after repeated
+     failures (_throttled_auth). Forge Neo's own files are not changed.
 
 How it works:
   - Re-exports the same names as upstream launch.py at module level, so other
@@ -159,6 +163,102 @@ def verify_version():
     print("", file=sys.stderr)
 
 
+def _throttled_auth(creds, max_attempts, lockout_seconds):
+    """Return a Gradio auth callable that checks *creds* and slows down guessing.
+
+    Gradio's built-in login has no limit on attempts. This wraps the same
+    (username, password) list Forge Neo would hand to Gradio:
+      - every failed attempt waits FAIL_DELAY seconds before answering
+      - after *max_attempts* failures within *lockout_seconds* for one
+        username, that username is locked for *lockout_seconds*; even the
+        right password is refused while locked
+      - a successful login clears that username's failures
+    State lives in memory only, so restarting the container clears every
+    lockout. Usernames are tracked whether or not they exist, so attempts
+    do not reveal which usernames are real. Passwords are never logged.
+    """
+    import hmac
+    import threading
+
+    FAIL_DELAY = 1.0      # seconds; short, because each waiting attempt holds a server thread
+    MAX_TRACKED = 1000    # cap memory if someone sprays random usernames
+
+    lock = threading.Lock()
+    failures = {}         # username -> list of failure timestamps
+    locked_until = {}     # username -> unlock time
+
+    def _matches(username, password):
+        ok = False
+        for user, pw in creds:
+            # Compare every entry, in constant time, so timing reveals nothing.
+            ok |= hmac.compare_digest(user.encode(), username.encode()) & hmac.compare_digest(pw.encode(), password.encode())
+        return ok
+
+    def _label(username):
+        return repr(username[:64])
+
+    def auth(username, password):
+        now = time.monotonic()
+        with lock:
+            until = locked_until.get(username, 0)
+            if until > now:
+                print(f"[login] Refused {_label(username)}: locked for {int(until - now)} more seconds.", file=sys.stderr)
+                return False
+        if _matches(username, password):
+            with lock:
+                failures.pop(username, None)
+                locked_until.pop(username, None)
+            return True
+        with lock:
+            if username not in failures and len(failures) >= MAX_TRACKED:
+                failures.pop(next(iter(failures)))
+            recent = [t for t in failures.get(username, []) if now - t < lockout_seconds] + [now]
+            failures[username] = recent
+            if len(recent) >= max_attempts:
+                locked_until[username] = now + lockout_seconds
+                failures.pop(username, None)
+                print(f"[login] {_label(username)} LOCKED for {lockout_seconds // 60} minutes after {len(recent)} failed attempts. "
+                      "Restart the container to clear it.", file=sys.stderr)
+            else:
+                print(f"[login] Failed login for {_label(username)} ({len(recent)}/{max_attempts}).", file=sys.stderr)
+        time.sleep(FAIL_DELAY)
+        return False
+
+    return auth
+
+
+def _install_login_throttle():
+    """Wrap Gradio's launch() so the login list Neo passes becomes _throttled_auth.
+
+    Only touches a plain list of (username, password) pairs, which is what
+    Forge Neo passes (webui.py, auth=gradio_auth_creds). Anything else, or
+    WEBUI_LOGIN_MAX_ATTEMPTS=0, leaves Gradio's behaviour unchanged.
+    """
+    try:
+        max_attempts = int(os.environ.get("WEBUI_LOGIN_MAX_ATTEMPTS", "5"))
+        lockout_minutes = int(os.environ.get("WEBUI_LOGIN_LOCKOUT_MINUTES", "15"))
+    except ValueError:
+        print("[login] WEBUI_LOGIN_MAX_ATTEMPTS / WEBUI_LOGIN_LOCKOUT_MINUTES must be whole numbers.", file=sys.stderr)
+        sys.exit(EXIT_CONFIG)
+    if max_attempts <= 0:
+        print("[login] Login throttling is OFF (WEBUI_LOGIN_MAX_ATTEMPTS=0).", file=sys.stderr)
+        return
+    lockout_minutes = max(lockout_minutes, 1)
+
+    import gradio as gr
+
+    original_launch = gr.Blocks.launch
+
+    def launch(self, *a, **kw):
+        creds = kw.get("auth")
+        if isinstance(creds, (list, tuple)) and creds and all(isinstance(c, (list, tuple)) and len(c) == 2 for c in creds):
+            kw["auth"] = _throttled_auth([(str(u), str(p)) for u, p in creds], max_attempts, lockout_minutes * 60)
+            print(f"[login] Login throttling on: {max_attempts} failed attempts locks a username for {lockout_minutes} minutes.", file=sys.stderr)
+        return original_launch(self, *a, **kw)
+
+    gr.Blocks.launch = launch
+
+
 def start():
     """Upstream launch_utils.start() with the launch line redacted."""
     mode = "API server" if "--nowebui" in sys.argv else "Web UI"
@@ -168,6 +268,8 @@ def start():
     from modules import logging_config
 
     logging_config.setup_logging(args.loglevel)
+
+    _install_login_throttle()
 
     # Import webui here (not at module level) because it depends on
     # prepare_environment() having already run.

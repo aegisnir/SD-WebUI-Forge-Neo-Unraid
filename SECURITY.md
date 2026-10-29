@@ -118,6 +118,11 @@ grep -n 'umask 077' start.sh
 
 - [ ] PASS if the README section "Extension management is on by default" exists and warns that anyone who can log in can install code, since `--enable-insecure-extension-access` is in the default args (owner decision, 2026-10-29).
 
+### Login protection
+
+- [ ] PASS if `WebUI/launch.py` installs `_install_login_throttle()` before importing `webui`, and the lockout is on by default (`WEBUI_LOGIN_MAX_ATTEMPTS` default 5).
+- [ ] PASS if passwords are never printed by the throttle (only usernames, truncated).
+
 ### HTTPS
 
 - [ ] PASS if `WEBUI_TLS` defaults to `auto` (HTTPS on) in both the Dockerfile/start.sh and `template.xml`.
@@ -166,9 +171,9 @@ If a future version removes extension support, the dev toolchain should be strip
 
 The `--tmpfs /tmp:rw,noexec,nosuid,nodev` mount prevents direct binary execution but does not prevent `python /tmp/script.py` or `bash /tmp/script.sh`. This is a fundamental limitation of `noexec`: it only blocks the kernel `execve` syscall, not interpreters reading files. Removing `/tmp` entirely would break Python (pip, tempfile) and many WebUI operations. Accepted as a defense-in-depth layer, not a complete execution barrier.
 
-### Gradio auth has no server-side rate limiting (M-7)
+### Login rate limiting (M-7, mitigated 2026-10-29)
 
-The WebUI's Gradio authentication does not implement rate limiting or account lockout. This was confirmed for Gradio 3 under A1111. Forge Neo uses Gradio 4.40, which has not been re-checked yet, so assume the same. Brute-force protection depends on network-level controls (firewall rules, reverse proxy rate limiting). This is an upstream limitation. The container is designed for trusted home-lab networks where this risk is low. If exposing to the internet, deploy behind a reverse proxy with rate limiting.
+Gradio's login has no rate limiting or lockout. `WebUI/launch.py` now wraps the credential list Forge Neo passes to Gradio: 1-second delay per failure, per-username lockout after `WEBUI_LOGIN_MAX_ATTEMPTS` (default 5) failures for `WEBUI_LOGIN_LOCKOUT_MINUTES` (default 15), constant-time comparison, in-memory state (a container restart clears lockouts). Remaining gaps: lockout is per username, not per client (Gradio's auth callback gets no client address), so an attacker can lock out a known username; `--api-auth` is not covered. MFA/passkeys need an authenticating reverse proxy.
 
 ### Plaintext credentials in auth file (M-8)
 
