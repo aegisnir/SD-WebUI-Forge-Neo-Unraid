@@ -99,6 +99,10 @@
 - Test on Aether as a second container on another port with a copy of the data: login,
   one image, Restart button, one extension, clean logs, speed vs the current xformers setup.
 - Re-check Gradio 4.40 for login rate limiting (SECURITY.md M-7).
+- After the first build works: switch the base image to plain `ubuntu:24.04` (digest-pinned).
+  Ubuntu 22.04 standard support ends April 2027, and the `nvidia/cuda` base duplicates the CUDA
+  libraries the torch wheels already install. Set `NVIDIA_VISIBLE_DEVICES` and
+  `NVIDIA_DRIVER_CAPABILITIES` in the Dockerfile (the CUDA image set them), then re-test on Aether.
 - Re-run fresh install, persistence, and read-only smoke tests before promoting `:latest`.
 - CA App Store submission (deferred until `:latest` is ready).
 

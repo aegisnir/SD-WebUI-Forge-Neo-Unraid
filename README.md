@@ -149,18 +149,21 @@ A `[READY]` box appears once the WebUI accepts connections. If the container fin
 
 After the container starts, you will see a login page. Log in with `admin` / `changeme` (the default credentials). If you have not added a model yet, the WebUI starts but cannot generate images. This is expected.
 
-You need at least one model (checkpoint) to generate images. Models are `.safetensors` files, typically 2–7 GB each. Forge Neo also runs newer model families such as Flux, Qwen and Wan.
+You need at least one model (checkpoint) to generate images. Models are usually `.safetensors` files (Neo also loads `.gguf` and `.ckpt`), typically 2–7 GB each. Forge Neo also runs newer model families such as Flux, Qwen and Wan.
 
 ### Recommended: install a CivitAI browser extension
 
 > [!NOTE]
-> Managing extensions from the WebUI needs `--enable-insecure-extension-access` in `COMMANDLINE_ARGS`. It is off by default. See [Migration Notes](#extension-management-removed-from-defaults) for the trade-off. Also check that an extension supports Forge Neo before installing it: many A1111 extensions need a Neo-specific fork.
+> Managing extensions from the WebUI needs `--enable-insecure-extension-access` in `COMMANDLINE_ARGS`. It is off by default. See [Extension management is off by default](#extension-management-is-off-by-default) for the trade-off. Also check that an extension supports Forge Neo before installing it: many A1111 extensions need a Neo-specific fork.
 
 The easiest way to browse and download models is with a CivitAI browser extension, which lets you search and download models from [CivitAI](https://civitai.com/) directly inside the WebUI.
 
 **Recommended:** [CivBrowser](https://github.com/SignalFlagZ/sd-webui-civbrowser) by SignalFlagZ. Actively maintained, supports searching and downloading models across multiple tabs.
 
-**Alternative:** [CivitAI Browser+](https://github.com/BlafKing/sd-civitai-browser-plus) by BlafKing. Feature-rich (download, delete, scan for updates, tag management, multi-threaded downloads). Note: this repository is **archived** and no longer receiving updates, but the extension still works.
+**Alternative:** [CivitAI Browser+](https://github.com/BlafKing/sd-civitai-browser-plus) by BlafKing. Feature-rich (download, delete, scan for updates, tag management, multi-threaded downloads). Note: this repository is **archived** and no longer receiving updates.
+
+> [!WARNING]
+> Neither extension has been tested with Forge Neo in this container yet. Both were written for AUTOMATIC1111. Look for a Neo-compatible fork first.
 
 #### Installing from the Available tab (easiest)
 
@@ -204,7 +207,7 @@ If you prefer to download models manually:
 | Checkpoint (SDXL) | `models/Stable-diffusion/` | 6–7 GB |
 | LoRA / LyCORIS | `models/Lora/` | 10–200 MB |
 | VAE | `models/VAE/` | 300–800 MB |
-| Textual Inversion / Embedding | `embeddings/` | 10–100 KB |
+| Textual Inversion / Embedding | `models/embeddings/` | 10–100 KB |
 
 ---
 
@@ -224,12 +227,12 @@ The container uses two main mount points. Here is where everything lives:
 
 /data/                            (host: /mnt/user/ai/data/)
 ├── models/
-│   ├── Stable-diffusion/         Model checkpoints (.safetensors, .ckpt)
+│   ├── Stable-diffusion/         Model checkpoints (.safetensors, .gguf, .ckpt)
 │   ├── VAE/                      VAE models
-│   └── Lora/                     LoRA/LyCORIS models
+│   ├── Lora/                     LoRA/LyCORIS models
+│   └── embeddings/               Textual inversions
 ├── output/                       Generated images
 ├── extensions/                   Installed extensions
-├── embeddings/                   Textual inversions
 ├── python-user/                  Packages installed by extensions (safe to delete)
 ├── pip-cache/                    Cached pip downloads for extensions
 └── tmp/                          Temporary files (cleaned on start)
@@ -290,16 +293,13 @@ The auth file is created with `chmod 600` (owner read/write only). This prevents
 
 #### API auth mirroring
 
-If API is enabled (`--api`), the container mirrors auth-file credentials into `--api-auth` by default. You can control that with:
+If API is enabled (`--api`), the container can copy the auth-file credentials into `--api-auth`. This is **off** by default. Control it with:
 
-- `API_AUTH_FILE_MODE=mirror-webui-file`
-- `API_AUTH_FILE_MODE=disabled`
+- `API_AUTH_FILE_MODE=mirror-webui-file`: copy the credentials
+- `API_AUTH_FILE_MODE=disabled` (default): leave API auth to you
 
 > [!WARNING]
 > **API auth exposure:** The WebUI's `--api-auth` flag accepts credentials as a plain string (not a file path). When mirroring is active, the container appends `--api-auth user:password` to the `COMMANDLINE_ARGS` environment variable. This means credentials are readable via `docker inspect` and `/proc/<pid>/environ` by any process or user that can inspect the container. This is a known upstream limitation of the WebUI's API auth mechanism (inherited from AUTOMATIC1111). There is no file-based equivalent for `--api-auth`. If this exposure is unacceptable for your environment, set `API_AUTH_FILE_MODE=disabled` and do not enable the API, or place the entire service behind a reverse proxy that handles API auth at the network layer.
-
-> [!IMPORTANT]
-> **Why `WEBUI_USERNAME` / `WEBUI_PASSWORD` were removed:** Passing credentials via template/env variables exposes them in the same way. Auth-file based login (`--gradio-auth-path`) is safer because the credential string never appears in env vars or command-line arguments.
 
 #### Manual auth flags
 
@@ -337,7 +337,7 @@ API is intentionally not part of the default args. Add `--api` only when you exp
 
 Use the defaults as a starting point, then tune for your own hardware, risk tolerance, and workflow.
 
-For a complete list of supported arguments, run `python launch.py --help` inside the container or see the [Forge Neo README](https://github.com/Haoming02/sd-webui-forge-classic/tree/neo).
+For a complete list of supported arguments, see the [Forge Neo README](https://github.com/Haoming02/sd-webui-forge-classic/tree/neo).
 
 <details>
 <summary><strong>Flag details and security considerations</strong></summary>
@@ -378,26 +378,8 @@ You can mount certificate files into the container and add the TLS flags to `COM
 
 </details>
 
-<details>
-<summary><strong>Auto TLS-HTTPS extension (zero-config option)</strong></summary>
-
-The [Auto TLS-HTTPS](https://github.com/papuSpartan/stable-diffusion-webui-auto-tls-https) extension by papuSpartan can automatically generate a self-signed certificate and enable HTTPS with zero configuration. When installed, it:
-
-1. Generates a key/certificate pair automatically.
-2. Fuses the certificate with Python's trust store so internal WebUI requests succeed.
-3. Starts serving over HTTPS without manual certificate management.
-
-You can also bring your own certificate by passing `--tls-keyfile` and `--tls-certfile`. The extension will incorporate it into the trust bundle.
-
-**Caveats:**
-- On Forge Neo, this extension can crash startup on Python 3.13 (it pulls an old `trio` package). Prefer the direct TLS flags above, or a reverse proxy.
-- Self-signed certificates will trigger browser warnings. You can add a browser exception or import the generated `webui.cert` into your OS trust store.
-- The extension has not been updated in ~2 years (last commit May 2024), though it remains functional.
-- A reverse proxy is still the more robust long-term solution, especially if you need certificate renewal, hostname routing, or multi-service TLS.
-
-Install it from the **Extensions** → **Available** tab (search for `Auto TLS-HTTPS`) or via **Install from URL** with `https://github.com/papuSpartan/stable-diffusion-webui-auto-tls-https.git`.
-
-</details>
+> [!WARNING]
+> Avoid the Auto TLS-HTTPS extension. It was written for AUTOMATIC1111, and on Forge Neo it can crash startup on Python 3.13 (it pulls an old `trio` package).
 
 ### `--data-dir`
 
@@ -541,8 +523,8 @@ The container automatically restarts the WebUI process if it exits. You do not n
 - If `/data` ended up owned by root (e.g., after deleting and Docker recreating the host directory), the container self-heals this automatically. See below.
 - If using `--read-only`, make sure required writable paths are explicitly mounted.
 
-### Error: `Operation not permitted` in entrypoint (`chmod`, `runuser`, or `setpriv`)
-- If logs show messages like `chmod: changing permissions of '/data': Operation not permitted`, `runuser: cannot set groups`, or `setpriv: setresuid failed`, the host/runtime is denying metadata or UID/GID transitions.
+### Error: `Operation not permitted` in entrypoint (`chmod` or `setpriv`)
+- If logs show messages like `chmod: changing permissions of '/data': Operation not permitted` or `setpriv: setresuid failed`, the host/runtime is denying metadata or UID/GID transitions.
 - The container prints a short runtime diagnostic line with `NoNewPrivs`, `Seccomp`, and `CapEff` values to help identify this class of restriction.
 - Typical causes: rootless/user-namespace remap behavior, no-new-privileges hardening, NFS root-squash exports, or share ACL/mount policy restrictions.
 - Fix on host first, then restart:
@@ -559,9 +541,9 @@ If you delete the host data directory (default: `/mnt/user/ai/data/`), Docker ma
 **In most cases this is fully automatic.** The container entrypoint runs as root, detects the wrong ownership, corrects it, then drops to the unprivileged app user before startup continues. You should see a log line like:
 
 ```
-[entrypoint] /data is owned by uid=0, expected uid=99.
-[entrypoint] Correcting ownership to 99:100 (nobody:users) and setting mode 775...
-[entrypoint] /data ownership corrected. Continuing startup.
+[entrypoint] /data is owned by uid=0:gid=0, expected 99:100.
+[entrypoint] Correcting ownership and permissions under /data...
+[entrypoint] Repaired 42 files under /data. Continuing startup.
 ```
 
 **If the auto-fix fails** (NFS shares with root squash, unusual SELinux policies, or other host-side restrictions), correct ownership manually on the Unraid host and restart:
@@ -590,7 +572,7 @@ chmod 775 /mnt/user/ai/data
 | `RESTART_DELAY_MAX` | `60` | Backoff ceiling (seconds) for crash restarts |
 | `RESTART_MAX_ATTEMPTS` | `0` | `0` = retry indefinitely; N = stop after N consecutive crash restarts |
 | `PYTHONUSERBASE` | `/data/python-user` | Where packages installed by extensions go |
-| `WEBUI_HOST_IP` | `0.0.0.0` | IP address the WebUI binds to inside the container |
+| `WEBUI_HOST_IP` | *(unset)* | Address shown in the `[READY]` log banner. Set it to your Unraid IP in bridge mode, where the container can't see it. It does not change where the WebUI listens. |
 | `UMASK` | *(unset)* | Override default umask for all file creation (e.g., `022`) |
 | `NO_COLOR` | *(unset)* | Set to `1` to suppress ANSI color codes in container logs |
 | `TERM` | *(unset)* | Set to `dumb` to suppress ANSI color codes (alternative to `NO_COLOR`) |
@@ -599,10 +581,10 @@ chmod 775 /mnt/user/ai/data
 
 ### Coming from the old A1111 image
 
-The image, template and repository were renamed: `ghcr.io/aegisnir/sd-webui-forge-neo-unraid`, template `SD-WebUI-Forge-Neo-Unraid`, repository `aegisnir/sd-webui-forge-neo-unraid`. Add the new template as a new container. Your models in `/data` work as they are.
+This is a new project. The old AUTOMATIC1111 container ([aegisnir/A1111-unraid](https://github.com/aegisnir/A1111-unraid)) and its image stay where they are, so existing installs keep working. To switch, add this template as a new container. Your models in `/data` work as they are.
 
-- **Settings:** the container renames `/config/a1111` to `/config/webui` on first start. Forge Neo then stops with a message, because A1111 settings are not compatible. Move `config.json` and `ui-config.json` out of the appdata `webui/` folder and restart.
-- **Outputs:** Neo saves to `/data/output` (A1111 used `/data/outputs`). Your old images stay where they are. To keep using the old folder, set it in **Settings → Paths for saving**.
+- **Settings:** if you point this container at the old appdata folder, it renames `/config/a1111` to `/config/webui` on first start. Forge Neo then stops with a message, because A1111 settings are not compatible. Move `config.json` and `ui-config.json` out of the appdata `webui/` folder and restart.
+- **Outputs:** Neo saves to `/data/output` (A1111 used `/data/outputs`). Your old images stay where they are. To keep using the old folder, set it in **Settings → Paths for Saving**.
 - **Old Python files:** `/data/venv` and `/data/repositories` are no longer used. The container leaves them alone. Delete them to free space.
 - **Extensions:** many A1111 extensions do not work on Neo. Check each one for a Neo version.
 - **Flags:** `--xformers` is no longer a default (see [`COMMANDLINE_ARGS`](#commandline_args)). `--no-download-sd-model`, `--disable-safe-unpickle` and `--allow-code` are removed by Neo and dropped automatically.
@@ -611,17 +593,15 @@ The image, template and repository were renamed: `ghcr.io/aegisnir/sd-webui-forg
 
 Your `config.json` already has Neo's version marker, so settings carry over. The entrypoint changes `/data` ownership to `99:100` on first start. If the old container ran as another user, test with a **copy** of the data first, because the old container may not be able to write to it afterwards.
 
-### Extension management removed from defaults
+### Extension management is off by default
 
-Previous versions included `--enable-insecure-extension-access` in the default `COMMANDLINE_ARGS`.  This flag bypasses the WebUI's built-in safety check that prevents installing extensions from the WebUI when the server is network-accessible.
+The WebUI blocks installing extensions from its Extensions tab when it is reachable over the network (`--listen`). This container keeps that block on. The old A1111 container turned it off by default.
 
-**What changed:** The flag is no longer in the default template.  If you install extensions through the WebUI's ==Extensions== tab, they will stop working after updating to this version.
+**How to turn it on:** add `--enable-insecure-extension-access` to `COMMANDLINE_ARGS` (the template's Extra Args). This is an explicit opt-in to the security trade-off.
 
-**How to restore it:** Add `--enable-insecure-extension-access` to your container's `COMMANDLINE_ARGS` environment variable (via Unraid template or Docker Compose).  This is an explicit opt-in to the security tradeoff.
+**Why it is off:** extensions run their own code inside the container. With the flag on, anyone who can log in can install one from any git URL.
 
-**Why:** Extensions have full code execution within the container.  Allowing unauthenticated remote installation of arbitrary code is a significant risk when combined with network exposure.  Users who need this feature can still enable it, but it should be a conscious decision.
-
-**Alternative:** Install extensions via the container's `/data/extensions/` directory by cloning them from the host or a startup script.  This does not require the flag.
+**Alternative:** install extensions from the host by cloning them into `/data/extensions/`, then restart the container. This does not need the flag.
 
 ## Advanced Topics
 
