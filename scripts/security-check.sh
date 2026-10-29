@@ -129,7 +129,9 @@ check_syntax_and_template() {
 
   if command -v shellcheck >/dev/null 2>&1; then
     # SC2317: "unreachable" false positive for trap handler function bodies.
-    if shellcheck -s bash --exclude=SC2317 entrypoint.sh start.sh scripts/security-check.sh >/dev/null 2>&1; then
+    # SC2329: "never invoked" false positive for the same handlers (shellcheck 0.11+,
+    # which ubuntu-latest ships since the Ubuntu 26 runner switch in October 2026).
+    if shellcheck -s bash --exclude=SC2317,SC2329 entrypoint.sh start.sh scripts/security-check.sh >/dev/null 2>&1; then
       pass "shellcheck passed (entrypoint.sh, start.sh, scripts/security-check.sh)"
     else
       fail "shellcheck reported issues in startup scripts"
