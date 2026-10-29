@@ -12,6 +12,10 @@ I am keeping this intentionally lightweight. This is a personal, AI-assisted hob
 - **Crash loop on first start:** Forge Neo unpacks its bundled tokenizer files into its own program folder on first start, which is read-only in this image (`OSError: [Errno 30] Read-only file system`). The build now unpacks them, and checks their SHA-256 using Neo's own code.
 - **Built-in preprocessor packages installed at startup instead of build time:** Neo skips all extension installers when `<data-dir>/extensions` doesn't exist, so the build never installed the ControlNet preprocessor packages and they were downloaded into `/data/python-user` on first start. The build now creates that folder, so they are baked in and covered by the image scan.
 
+### Changed (login page)
+
+- The login page now shows the lockout rule above the form (Gradio's `auth_message`), because Gradio can only answer "Incorrect credentials", even for a locked username.
+
 ### Fixed (UI half-loaded on first Aether test, 2026-10-29)
 
 - **Built-in Spectrum extension failed to load:** it creates `presets.json` in its own folder on first load (read-only here). That file is now a link to `/config/webui/spectrum-presets.json`, so presets are saved in appdata.

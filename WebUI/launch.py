@@ -254,6 +254,11 @@ def _install_login_throttle():
         if isinstance(creds, (list, tuple)) and creds and all(isinstance(c, (list, tuple)) and len(c) == 2 for c in creds):
             kw["auth"] = _throttled_auth([(str(u), str(p)) for u, p in creds], max_attempts, lockout_minutes * 60)
             print(f"[login] Login throttling on: {max_attempts} failed attempts locks a username for {lockout_minutes} minutes.", file=sys.stderr)
+            # Gradio's login page can only say "Incorrect credentials", even when
+            # the username is locked, so state the rule above the form.
+            if not kw.get("auth_message"):
+                kw["auth_message"] = (f"{max_attempts} failed logins lock that username for {lockout_minutes} minutes. "
+                                      "Restarting the container clears it.")
         return original_launch(self, *a, **kw)
 
     gr.Blocks.launch = launch

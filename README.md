@@ -476,10 +476,11 @@ Gradio's login page has no limit on password guesses. This container adds one. I
 **How it works:**
 - Every failed login waits 1 second before answering.
 - After `WEBUI_LOGIN_MAX_ATTEMPTS` (default **5**) failed logins for the same username within the lockout window, that username is locked for `WEBUI_LOGIN_LOCKOUT_MINUTES` (default **15**). While locked, even the correct password is refused.
-- A successful login clears that username's failures. Other usernames are not affected.
+- A successful login clears that username's failures. Other usernames are not affected, so trying a *different* username each time never locks anything; only repeated tries on one username do.
 - Unknown usernames are treated the same way, so attempts don't reveal which usernames exist.
 - The container log shows each failed login and each lockout, with the username but never the password.
 - Passwords are compared in constant time, so response timing reveals nothing.
+- The login page shows a line above the form stating the limit (for example *"5 failed logins lock that username for 15 minutes. Restarting the container clears it."*). Gradio's login page can only say "Incorrect credentials", so a locked username gets that same message; the line above the form is how you know a lockout is possible.
 
 **Locked yourself out?** Restart the container. Lockouts are kept in memory only, so a restart clears them all. Or wait out the lockout time.
 
