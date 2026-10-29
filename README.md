@@ -248,7 +248,7 @@ The included Unraid template sets `--runtime=nvidia` in Extra Parameters by defa
    - Host: `https://<unraid-ip>:7860`
    - Custom network: `https://<container-ip>:7860`
 
-   You can also use a hostname instead of the IP, for example `https://<your-server-name>:7860`. That is the name of your Unraid server (Settings → Identification; Unraid's default is `Tower`), which many home networks also answer as `<your-server-name>.local`, or any DNS name you set up. Add that name to `WEBUI_TLS_HOSTNAMES` so the certificate matches it. Note the **https**: plain `http://` does not work while HTTPS is on. The first time, your browser warns about the self-signed certificate; see [HTTPS / TLS](#https--tls).
+   You can also use a hostname instead of the IP, for example `https://<your-server-name>:7860`. That is the name of your Unraid server (Settings → Identification; Unraid's default is `Tower`), which many home networks also answer as `<your-server-name>.local`, or any DNS name you set up. Add that name to `WEBUI_TLS_HOSTNAMES` so the certificate matches it. Recommended: your full name first, then the server's IP, comma-separated with no spaces, for example `myserver.example.com,192.168.1.10`. Note the **https**: plain `http://` does not work while HTTPS is on. The first time, your browser warns about the self-signed certificate; see [HTTPS / TLS](#https--tls).
 
 If you build your own image, the Dockerfile pins a Forge Neo release through `WEBUI_TAG` and `WEBUI_REF` (that release's commit). These are build-time settings for image builders, not runtime variables. See [Upstream version pinning](#upstream-version-pinning).
 
@@ -538,7 +538,7 @@ HTTPS is **on by default** (`WEBUI_TLS=auto`). This is this container's own feat
 
 - The certificate uses ECDSA P-256 and is valid for 825 days, the longest that Apple devices accept. It is renewed automatically 30 days before it expires.
 - The private key is created with owner-only permissions (`600`) inside a folder only the container user can open (`700`). It is never printed to the log.
-- The certificate covers `localhost`, `127.0.0.1`, the container's hostname, `WEBUI_HOST_IP` if you set it, and any names you list in `WEBUI_TLS_HOSTNAMES` (for example `myserver.local,192.168.1.10`). Change that list and a new certificate is made on the next start. Entries that are not a plain hostname or IPv4 address stop startup with an error.
+- The certificate covers `localhost`, `127.0.0.1`, the container's hostname, `WEBUI_HOST_IP` if you set it, and any names you list in `WEBUI_TLS_HOSTNAMES`. Recommended format: the full hostname (FQDN) first, then the server's IP, comma-separated with no spaces, for example `myserver.example.com,192.168.1.10`. Listing both lets you open the WebUI either way without a name-mismatch warning. Change that list and a new certificate is made on the next start. Entries that are not a plain hostname or IPv4 address stop startup with an error.
 - Certificate checks stay on. Other setups often add `--disable-tls-verify`; this container adds its certificate to the trust list Gradio uses instead, so Gradio's own startup check still verifies the connection.
 - The healthcheck and the `[READY]` banner work over HTTPS (the banner shows the `https://` address).
 
@@ -759,7 +759,7 @@ chmod 775 <data-path>
 | `RESTART_DELAY_MAX` | `60` | Backoff ceiling (seconds) for crash restarts |
 | `RESTART_MAX_ATTEMPTS` | `0` | `0` = retry indefinitely; N = stop after N consecutive crash restarts |
 | `WEBUI_TLS` | `auto` | `auto` = HTTPS with your certificate or a self-signed one; `off` = plain HTTP. See [HTTPS / TLS](#https--tls). |
-| `WEBUI_TLS_HOSTNAMES` | *(unset)* | Extra hostnames or IPv4 addresses for the self-signed certificate, comma-separated |
+| `WEBUI_TLS_HOSTNAMES` | *(unset)* | Extra hostnames or IPv4 addresses for the self-signed certificate. Recommended: FQDN first, then IP, comma-separated with no spaces (`myserver.example.com,192.168.1.10`) |
 | `WEBUI_LOGIN_MAX_ATTEMPTS` | `5` | Failed logins per username before a lockout; `0` turns login protection off |
 | `WEBUI_LOGIN_LOCKOUT_MINUTES` | `15` | How long a lockout lasts (also the window failures are counted in) |
 | `PYTHONUSERBASE` | `/data/python-user` | Where packages installed by extensions go |
