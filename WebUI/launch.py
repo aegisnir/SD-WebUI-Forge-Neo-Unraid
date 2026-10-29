@@ -8,9 +8,10 @@ upstream's main() step for step, with two container-specific changes:
      paths) are never printed in plain text to the container log.
   2. No interactive prompt: upstream's verify_version() calls input() when
      config.json comes from an older WebUI version. A container has no
-     keyboard, so that would hang or crash. This wrapper prints the same
-     warning and exits with EXIT_CONFIG, which start.sh treats as fatal
-     instead of restarting in a loop.
+     keyboard, so that would hang or crash. This wrapper backs up the old
+     settings files, starts fresh and logs what it did. Only if that fails
+     does it exit with EXIT_CONFIG, which start.sh treats as fatal instead
+     of restarting in a loop.
 
 How it works:
   - Re-exports the same names as upstream launch.py at module level, so other
@@ -27,6 +28,7 @@ import json
 import os
 import shlex
 import sys
+import time
 
 from modules import launch_utils
 
@@ -97,8 +99,12 @@ def verify_version():
     """Non-interactive replacement for launch_utils.verify_version().
 
     Same checks as upstream: a missing config.json is created with the current
-    VERSION_UID, a matching one passes. A config.json from an older WebUI
-    version stops startup with instructions instead of waiting for Enter.
+    VERSION_UID, a matching one passes. Upstream asks for a clean settings
+    reset when config.json comes from an older WebUI version and waits for
+    Enter. Here the old config.json and ui-config.json are moved to dated
+    backups instead (nothing is deleted), a fresh config.json is written, and
+    the log says what happened. If the move fails, startup stops with
+    EXIT_CONFIG and instructions.
     """
     settings_file = args.ui_settings_file
     expected = launch_utils.VERSION_UID
@@ -115,18 +121,42 @@ def verify_version():
     if settings.get("VERSION_UID", None) == expected:
         return
 
-    settings_dir = os.path.dirname(os.path.realpath(settings_file))
+    # realpath: on this container these are symlinks into /config/webui, and
+    # the files themselves must move, not the links.
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    moved = []
+    try:
+        for path in (settings_file, args.ui_config_file):
+            real = os.path.realpath(path)
+            if os.path.isfile(real):
+                backup = f"{real}.pre-neo-{stamp}.bak"
+                os.replace(real, backup)
+                moved.append(backup)
+        with open(settings_file, "w", encoding="utf8") as file:
+            json.dump({"VERSION_UID": expected}, file)
+    except OSError as exc:
+        settings_dir = os.path.dirname(os.path.realpath(settings_file))
+        print("", file=sys.stderr)
+        print("=" * 72, file=sys.stderr)
+        print("STOPPED: config.json is from an older WebUI version, and moving it", file=sys.stderr)
+        print(f"aside failed ({exc.__class__.__name__}: {exc}).", file=sys.stderr)
+        print(f"Fix: move config.json and ui-config.json out of {settings_dir}", file=sys.stderr)
+        print("     (on Unraid: the container's appdata folder, under webui/),", file=sys.stderr)
+        print("     then restart the container. Models and outputs are not affected.", file=sys.stderr)
+        print("=" * 72, file=sys.stderr)
+        sys.exit(EXIT_CONFIG)
+
     print("", file=sys.stderr)
     print("=" * 72, file=sys.stderr)
-    print("STOPPED: config.json is from an older WebUI version.", file=sys.stderr)
-    print("Forge Neo has breaking changes and asks for a clean settings reset.", file=sys.stderr)
-    print("", file=sys.stderr)
-    print(f"Fix: move config.json and ui-config.json out of {settings_dir}", file=sys.stderr)
-    print("     (on Unraid: the container's appdata folder, under webui/),", file=sys.stderr)
-    print("     then restart the container. Models and outputs are not affected.", file=sys.stderr)
+    print("NOTICE: config.json was from an older WebUI version (for example", file=sys.stderr)
+    print("AUTOMATIC1111). Forge Neo needs fresh settings, so the old files were", file=sys.stderr)
+    print("kept as backups and the WebUI starts with default settings:", file=sys.stderr)
+    for backup in moved:
+        print(f"  {backup}", file=sys.stderr)
+    print("Re-apply any settings you want in the Settings tab.", file=sys.stderr)
+    print("Models, outputs and extensions are not affected.", file=sys.stderr)
     print("=" * 72, file=sys.stderr)
     print("", file=sys.stderr)
-    sys.exit(EXIT_CONFIG)
 
 
 def start():

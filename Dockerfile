@@ -140,7 +140,9 @@ LABEL org.opencontainers.image.title="SD-WebUI-Forge-Neo-Unraid" \
 # PyTorch's built-in scaled_dot_product_attention, which Neo's README calls
 # "usually as fast, and also more stable".
 # ------------------------------------------------------------------------------
-ENV COMMANDLINE_ARGS="--listen --port 7860 --data-dir /data"
+# --enable-insecure-extension-access: lets logged-in users install extensions
+# from the WebUI. On by default (owner decision); see README "Extensions".
+ENV COMMANDLINE_ARGS="--listen --port 7860 --data-dir /data --enable-insecure-extension-access"
 # Shown in the startup log banner (start.sh).
 ENV IMAGE_VERSION="${IMAGE_VERSION}"
 ENV WEBUI_TAG="${WEBUI_TAG}"

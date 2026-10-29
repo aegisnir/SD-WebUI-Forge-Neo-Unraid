@@ -43,6 +43,15 @@ release 2.31. Container hardening, auth handling, log redaction and the restart 
 - **gradio 4.40.0 → 4.44.1** (security mitigation, untested by Neo upstream, may break parts of
   the UI): fixes 5 of 28 known CVEs. The remaining 23 are listed in the README
   ("Known security issues") and accepted in `.trivyignore` with reasons and a 2027-01-31 expiry
+- **Extensions on by default**: `--enable-insecure-extension-access` is in the default args
+  (owner decision; the A1111 image had it off). README warns that anyone who can log in can
+  then install code
+- **Old settings handled automatically**: a `config.json` from an older WebUI (VERSION_UID
+  mismatch) is moved to `*.pre-neo-<date>.bak` with `ui-config.json`, and the WebUI starts with
+  defaults and a log notice, instead of stopping. Exit code 78 remains only if the move fails
+- **README**: plain-English impact for every gradio CVE (checked against Neo 2.31's use of each
+  Gradio feature), extension guidance for Forge Neo, CivitAI extension status, `<data-path>`
+  placeholder, how to build with gradio 4.40.0, why the restart loop exists
 - **Build fix**: gradio and Neo's requirements are installed in two steps, as Neo does, because
   gradio declares `Pillow<11` while Neo pins Pillow 13
 

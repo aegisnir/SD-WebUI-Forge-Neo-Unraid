@@ -2,7 +2,6 @@
 
 **[Forge Neo](https://github.com/Haoming02/sd-webui-forge-classic/tree/neo) by Haoming02, packaged for Unraid by Aegisnir.**
 
-[![Cyan badge displaying latest GitHub release version for forge-neo-unraid, clickable to view release history](https://img.shields.io/github/v/release/aegisnir/sd-webui-forge-neo-unraid?include_prereleases&label=release&color=cyan)](https://github.com/aegisnir/sd-webui-forge-neo-unraid/releases)
 [![Blue badge with Docker logo indicating container image hosted on GitHub Container Registry, clickable to view packages](https://img.shields.io/badge/image-ghcr.io-blue?logo=docker)](https://github.com/aegisnir/sd-webui-forge-neo-unraid/pkgs/container/sd-webui-forge-neo-unraid)
 [![Orange badge identifying upstream source as Forge Neo, clickable to view repository](https://img.shields.io/badge/upstream-Forge%20Neo-orange)](https://github.com/Haoming02/sd-webui-forge-classic/tree/neo)
 [![Green badge indicating AGPL-3.0 License, clickable to view license file](https://img.shields.io/badge/license-AGPL--3.0-green)](LICENSE)
@@ -14,6 +13,8 @@
 [![Light blue badge indicating security hardening with best practices implemented, clickable to view security details](https://img.shields.io/badge/security-hardened-informational)](SECURITY.md)
 
 Forge Neo is Haoming02's work, a maintained fork of the Stable Diffusion WebUI. This repository does not change the WebUI. It only packages it as a hardened Unraid container with NVIDIA GPU support in mind. Bugs in the WebUI itself belong [upstream](https://github.com/Haoming02/sd-webui-forge-classic/issues). The goal is to keep it practical, easy to use, and security-conscious.
+
+Forge Neo's own repository includes a basic [Docker setup](https://github.com/Haoming02/sd-webui-forge-classic/tree/neo/docker). This project is a separate, Unraid-focused packaging with its own hardening, HTTPS and login handling.
 
 I couldn't find a Forge Neo container built for Unraid, so I made one. I had been running Forge Neo from a generic Docker image I found online, but since it wasn't built for Unraid, I ran into issues with automatic updates and other quirks. I'm making this repo public in the hopes that it will be useful to others.
 
@@ -64,43 +65,46 @@ Forge Neo 2.31 pins **Gradio 4.40.0**, the web framework that draws the whole UI
 
 ### What this container does about it
 
-- **Mitigation attempt (may break things):** this image upgrades Gradio from 4.40.0 to **4.44.1**, the last Gradio 4 release. That fixes 5 of the 28 ([CVE-2024-47084](https://osv.dev/vulnerability/CVE-2024-47084), a high-rated CORS bypass, plus [CVE-2024-47166](https://osv.dev/vulnerability/CVE-2024-47166), [CVE-2024-47168](https://osv.dev/vulnerability/CVE-2024-47168), [CVE-2024-47869](https://osv.dev/vulnerability/CVE-2024-47869) and [CVE-2024-48052](https://osv.dev/vulnerability/CVE-2024-48052)). Forge Neo itself is not tested with 4.44.1, so parts of the UI might misbehave. If you hit a problem, please [open an issue](https://github.com/aegisnir/sd-webui-forge-neo-unraid/issues). Image builders can go back with `--build-arg GRADIO_VERSION=4.40.0`.
+- **Mitigation attempt (may break things):** this image upgrades Gradio from 4.40.0 to **4.44.1**, the last Gradio 4 release. That fixes 5 of the 28 ([CVE-2024-47084](https://osv.dev/vulnerability/CVE-2024-47084), a high-rated CORS bypass, plus [CVE-2024-47166](https://osv.dev/vulnerability/CVE-2024-47166), [CVE-2024-47168](https://osv.dev/vulnerability/CVE-2024-47168), [CVE-2024-47869](https://osv.dev/vulnerability/CVE-2024-47869) and [CVE-2024-48052](https://osv.dev/vulnerability/CVE-2024-48052)). Forge Neo itself is not tested with 4.44.1, so parts of the UI might misbehave. If you hit a problem, please [open an issue](https://github.com/aegisnir/sd-webui-forge-neo-unraid/issues). You can also [build your own image with Gradio 4.40.0](#build-with-the-original-gradio-4400).
 - **Login is always on**, and it is managed by the container (see [Authentication](#authentication-defaults)).
-- **HTTPS is on by default**, so logins and images are encrypted on your network (see [HTTPS / TLS](#https--tls)).
-- **Installing extensions from the WebUI is off by default**, and the container runs with a read-only filesystem, no root, and dropped privileges (see [Security Hardening](#security-hardening-defaults)).
+- **HTTPS is on by default**, so your password and images are encrypted as they cross your network. This is this container's own feature, not part of Forge Neo. On first start the container creates its own certificate (a *self-signed* certificate: one it vouches for itself, rather than a public authority). Your browser warns about it once; you can confirm it is genuine by comparing a fingerprint from the log. You can also supply your own certificate. See [HTTPS / TLS](#https--tls).
+- **The container runs with a read-only filesystem, no root, and dropped privileges** (see [Security Hardening](#security-hardening-defaults)).
+- **Installing extensions from the WebUI is ON by default**, for convenience. Anyone who can log in can install an extension, and extensions run their own code inside the container. See [Extensions](#extension-management-is-on-by-default) for how to turn it off.
 - **The build still scans every image** with Trivy and refuses to publish on new high or critical findings. The Gradio vulnerabilities below are accepted one by one in [`.trivyignore`](.trivyignore), each with its reason. Every entry expires on 2027-01-31, which forces a fresh review.
 
 ### Remaining Gradio 4.44.1 vulnerabilities
 
-Some of these concern Gradio features this WebUI may not use (share links through FRP, OAuth login, Windows-only paths, `gr.load`). I have not verified that one by one, so all of them are listed. "Fixed in" is the first Gradio version with the fix; "none" means there is no fix yet.
+**How to read this table.** "Severity" is the official rating, which assumes the worst case: an app open to the whole internet. Your real risk depends on who can reach the WebUI. Keeping it on a private home network (LAN) and off the internet **lowers** the risk of most of these a lot, because an attacker first has to get onto your network. It never makes the risk zero: a compromised device, a guest on your Wi-Fi, or a malicious web page open in your own browser can still reach the WebUI.
 
-| Severity | ID | Summary | Fixed in |
-|---|---|---|---|
-| Critical | [CVE-2025-23042](https://osv.dev/vulnerability/CVE-2025-23042) | Gradio Blocked Path ACL Bypass Vulnerability | 5.6.0 |
-| High | [CVE-2024-10569](https://osv.dev/vulnerability/CVE-2024-10569) | Gradio Vulnerable to Denial of Service (DoS) via Crafted Zip Bomb | none |
-| High | [CVE-2024-10624](https://osv.dev/vulnerability/CVE-2024-10624) | Gradio Vulnerable to Denial of Service (DoS) via Crafted HTTP Request | none |
-| High | [CVE-2024-10648](https://osv.dev/vulnerability/CVE-2024-10648) | Gradio Vulnerable to Arbitrary File Deletion | none |
-| High | [CVE-2024-47867](https://osv.dev/vulnerability/CVE-2024-47867) | Gradio lacks integrity checking on the downloaded FRP client | 5.0.0 |
-| High | [CVE-2024-47870](https://osv.dev/vulnerability/CVE-2024-47870) | Gradio has a race condition in update_root_in_config may redirect user traffic | 5.0.0 |
-| High | [CVE-2024-47871](https://osv.dev/vulnerability/CVE-2024-47871) | Gradio uses insecure communication between the FRP client and server | 5.0.0 |
-| High | [CVE-2024-8966](https://osv.dev/vulnerability/CVE-2024-8966) | Gradio DOS in multipart boundry while uploading the file | none |
-| High | [CVE-2026-28414](https://osv.dev/vulnerability/CVE-2026-28414) | Gradio is Vulnerable to Absolute Path Traversal on Windows with Python 3.13+ | 6.7.0 |
-| High | [CVE-2026-28416](https://osv.dev/vulnerability/CVE-2026-28416) | Gradio has SSRF via Malicious `proxy_url` Injection in `gr.load()` Config Processing | 6.6.0 |
-| High | [CVE-2026-48545](https://osv.dev/vulnerability/CVE-2026-48545) | Gradio contains a cookie injection vulnerability | 6.15.0 |
-| High | [CVE-2026-49119](https://osv.dev/vulnerability/CVE-2026-49119) | Gradio FileExplorer preprocess path traversal allows files outside root_dir to reach callbacks | 6.16.0 |
-| Moderate | [CVE-2024-12217](https://osv.dev/vulnerability/CVE-2024-12217) | Gradio Path Traversal vulnerability | none |
-| Moderate | [CVE-2024-47164](https://osv.dev/vulnerability/CVE-2024-47164) | Gradio's `is_in_or_equal` function may be bypassed | 5.0.0 |
-| Moderate | [CVE-2024-47165](https://osv.dev/vulnerability/CVE-2024-47165) | Gradio's CORS origin validation accepts the null origin | 5.0.0 |
-| Moderate | [CVE-2024-47167](https://osv.dev/vulnerability/CVE-2024-47167) | Gradio vulnerable to SSRF in the path parameter of /queue/join | 5.0.0 |
-| Moderate | [CVE-2024-47868](https://osv.dev/vulnerability/CVE-2024-47868) | Gradio has several components with post-process steps allow arbitrary file leaks | 5.0.0 |
-| Moderate | [CVE-2024-47872](https://osv.dev/vulnerability/CVE-2024-47872) | Gradio has an XSS on every Gradio server via upload of HTML files, JS files, or SVG files | 5.0.0 |
-| Moderate | [CVE-2025-48889](https://osv.dev/vulnerability/CVE-2025-48889) | Gradio Allows Unauthorized File Copy via Path Manipulation | 5.31.0 |
-| Moderate | [CVE-2026-28415](https://osv.dev/vulnerability/CVE-2026-28415) | Gradio has an Open Redirect in its OAuth Flow | 6.6.0 |
-| Low | [CVE-2026-10783](https://osv.dev/vulnerability/CVE-2026-10783) | Gradio: Audio cache key ignores metadata when saving numpy audio outputs | 6.15.1 |
-| Low | [CVE-2026-27167](https://osv.dev/vulnerability/CVE-2026-27167) | Gradio: Mocked OAuth Login Exposes Server Credentials and Uses Hardcoded Session Secret | 6.6.0 |
-| Low | [GHSA-26jh-r8g2-6fpr](https://osv.dev/vulnerability/GHSA-26jh-r8g2-6fpr) | Gradio's dropdown component pre-process step does not limit the values to those in the dropdown list | 5.0.0 |
+"Does it affect this container?" was checked against the Forge Neo 2.31 source code (for example, whether Forge Neo uses the affected Gradio feature at all). Extensions can add Gradio features, so an extension can bring a "No" back into play. "Fixed in" is the first Gradio version with the fix; "none" means there is no fix yet.
 
-Source: [OSV](https://osv.dev/list?ecosystem=PyPI&q=gradio), package `gradio`, version 4.44.1.
+| Severity | ID | What it means | Does it affect this container? | Fixed in |
+|---|---|---|---|---|
+| Critical | [CVE-2025-23042](https://osv.dev/vulnerability/CVE-2025-23042) | Gradio keeps a list of files the WebUI must never serve. On systems where file names ignore upper/lower case, changing the case of a name slips past that list. | **Unlikely.** The container runs Linux, where file names are case-sensitive, so the trick does not work on the container's own files. | 5.6.0 |
+| High | [CVE-2024-10569](https://osv.dev/vulnerability/CVE-2024-10569) | Uploading a "zip bomb" (a tiny file that expands enormously) into a table input can crash the server. | **Not in Forge Neo itself**: it has no table input. An extension could add one. A crash would be restarted automatically. | none |
+| High | [CVE-2024-10624](https://osv.dev/vulnerability/CVE-2024-10624) | Typing a specially crafted date or time can make the server's CPU spin for a long time. | **No.** Forge Neo has no date/time input. | none |
+| High | [CVE-2024-10648](https://osv.dev/vulnerability/CVE-2024-10648) | A trick in the audio component can empty out a file the server can write to. | **Very unlikely.** Forge Neo only uses audio to play a finished-sound, which users cannot send anything to. | none |
+| High | [CVE-2024-47867](https://osv.dev/vulnerability/CVE-2024-47867) | The helper Gradio downloads for public share links is not checked for tampering. | **Not by default.** Only matters if you add `--share`. Don't. | 5.0.0 |
+| High | [CVE-2024-47870](https://osv.dev/vulnerability/CVE-2024-47870) | A timing trick can make the WebUI page send your traffic, including your login session, to an attacker's server. | **Yes, possibly.** Someone must be able to reach the WebUI. On a private LAN that means a device or person already on your network; on the internet, anyone. | 5.0.0 |
+| High | [CVE-2024-47871](https://osv.dev/vulnerability/CVE-2024-47871) | Public share links use an unencrypted connection, so uploads can be read or changed in transit. | **Not by default.** Only with `--share`. | 5.0.0 |
+| High | [CVE-2024-8966](https://osv.dev/vulnerability/CVE-2024-8966) | An upload with an absurdly long internal separator keeps the server busy and unreachable. | **Yes.** Forge Neo accepts uploads. Effect: the WebUI stops responding until the request ends. No data is exposed. Anyone who can reach the WebUI could try it, so exposure to the internet raises this a lot. | none |
+| High | [CVE-2026-28414](https://osv.dev/vulnerability/CVE-2026-28414) | On Windows with Python 3.13+, an attacker can read any file. | **No.** Windows only; this container is Linux. | 6.7.0 |
+| High | [CVE-2026-28416](https://osv.dev/vulnerability/CVE-2026-28416) | Apps that load another Gradio app from Hugging Face can be tricked into making web requests for an attacker. | **No.** Forge Neo does not load remote Gradio apps. | 6.6.0 |
+| High | [CVE-2026-48545](https://osv.dev/vulnerability/CVE-2026-48545) | Apps that proxy Hugging Face Spaces can have cookies injected across users. | **No.** Same reason: no remote Spaces are loaded. | 6.15.0 |
+| High | [CVE-2026-49119](https://osv.dev/vulnerability/CVE-2026-49119) | The file-browser component can be tricked into reading files outside its folder. | **No.** Forge Neo does not use that component. | 6.16.0 |
+| Moderate | [CVE-2024-12217](https://osv.dev/vulnerability/CVE-2024-12217) | On Windows, a special file-name syntax slips past the blocked-files list. | **No.** Windows only. | none |
+| Moderate | [CVE-2024-47164](https://osv.dev/vulnerability/CVE-2024-47164) | A check that a file is inside an allowed folder can be fooled with `..` paths, which could expose files. | **Possibly.** It could expose files the container can read, such as settings. Your models and images are already visible to anyone logged in. | 5.0.0 |
+| Moderate | [CVE-2024-47165](https://osv.dev/vulnerability/CVE-2024-47165) | When the WebUI is opened as `localhost`, a hostile web page in your browser can send requests to it. | **Mostly no.** On Unraid you open it by IP or hostname, not `localhost`. Being on your LAN does not protect against this one, because the request comes from your own browser. | 5.0.0 |
+| Moderate | [CVE-2024-47167](https://osv.dev/vulnerability/CVE-2024-47167) | The server can be made to fetch any web address, letting an attacker probe other devices on your network through it. | **Possibly**, for someone who can reach the WebUI. Worth knowing because the WebUI sits inside your network. | 5.0.0 |
+| Moderate | [CVE-2024-47868](https://osv.dev/vulnerability/CVE-2024-47868) | Several components can be made to hand back files they should not. | **Possibly.** Same kind of exposure as CVE-2024-47164. | 5.0.0 |
+| Moderate | [CVE-2024-47872](https://osv.dev/vulnerability/CVE-2024-47872) | A logged-in user can upload an HTML or SVG file with script in it; whoever opens it runs that script in their browser. | **Only matters with several users.** If you are the only one who logs in, there is nobody to target. | 5.0.0 |
+| Moderate | [CVE-2025-48889](https://osv.dev/vulnerability/CVE-2025-48889) | Gradio's "flagging" feature can be made to copy files and fill the disk. | **No.** Forge Neo does not use flagging. | 5.31.0 |
+| Moderate | [CVE-2026-28415](https://osv.dev/vulnerability/CVE-2026-28415) | An open redirect in Gradio's Hugging Face login flow. | **No.** That login flow is not used; this container uses its own password login. | 6.6.0 |
+| Low | [CVE-2026-10783](https://osv.dev/vulnerability/CVE-2026-10783) | A weak checksum in the audio cache. | **No practical effect** here. | 6.15.1 |
+| Low | [CVE-2026-27167](https://osv.dev/vulnerability/CVE-2026-27167) | With Hugging Face login buttons outside Hugging Face, the server's own Hugging Face token can leak. | **No.** No such login button is used, and the container has no Hugging Face token unless you add one. | 6.6.0 |
+| Low | [GHSA-26jh-r8g2-6fpr](https://osv.dev/vulnerability/GHSA-26jh-r8g2-6fpr) | Drop-down menus accept values that are not in the list if someone sends a hand-made request. | **Yes, minor.** At worst, a setting gets an unexpected value. | 5.0.0 |
+
+Source: [OSV](https://osv.dev/list?ecosystem=PyPI&q=gradio), package `gradio`, version 4.44.1. Plain-English summaries are mine; follow each link for the official description.
 
 ### Forge Neo issues (not Gradio)
 
@@ -108,6 +112,8 @@ Found in a review of Forge Neo 2.31 and not fixed by this container:
 
 - **Stored XSS in the extra-networks cards** (`modules/ui_extra_networks.py`): model file names and search terms are not escaped. A model with a crafted file name or metadata could run script in your browser. Same pattern as AUTOMATIC1111's CVE-2026-111984.
 - **No size limit when reading `.safetensors` metadata** (`modules/sd_models.py`): a crafted model file can use a lot of memory. Same pattern as AUTOMATIC1111's CVE-2026-111985.
+
+**Can this container fix them?** Both have small, well-understood fixes. Patching Forge Neo's code inside the image is possible, but it means this image no longer runs exactly the upstream code. That is being considered; until then, the safest protection is to only add models from sources you trust. The plan is also to report both upstream.
 
 Forge Neo did remove AUTOMATIC1111's `.yaml` model-config code-execution path (CVE-2026-111986), and it always loads checkpoints with PyTorch's safer `weights_only=True` mode.
 
@@ -117,8 +123,8 @@ Forge Neo did remove AUTOMATIC1111's `.yaml` model-config code-execution path (C
 |---|---|---|
 | Default login `admin` / `changeme` on first start | So the WebUI is never without a login | Change it right away. The log warns until you do. |
 | No limit on login attempts | Gradio has no rate limiting or lockout (confirmed on Gradio 3, assumed on 4) | Keep it on your LAN, or put a reverse proxy with rate limiting in front |
-| Extensions run their own code | That is how WebUI extensions work | Only install extensions you trust |
-| `/data/python-user` holds packages installed by extensions, and runs on every start | The image itself is read-only, so extension packages live here | If you suspect a problem, delete that folder. Extensions reinstall what they need. |
+| Extensions run their own code, and anyone who can log in can install one | That is how WebUI extensions work; installing from the WebUI is on by default | Only install extensions you trust. Remove `--enable-insecure-extension-access` from Extra Args to lock the Extensions tab. |
+| `/data/python-user` holds packages installed by extensions, and runs on every start | The image itself is read-only, so extension packages live here | If you suspect a problem, delete that folder and restart the container. Extensions reinstall what they need during that start. |
 | API password in an environment variable | Only if you enable the API **and** set `API_AUTH_FILE_MODE=mirror-webui-file`; the WebUI has no file option for API auth | Leave the API off unless you need it |
 | A compiler is included in the image | Some extensions compile code when they install | None needed; a compromised extension could already run code anyway |
 | A few packages installed by Forge Neo's built-in ControlNet preprocessors are not version-pinned | Forge Neo does not pin them | They are scanned with the rest of the image |
@@ -128,6 +134,7 @@ Forge Neo did remove AUTOMATIC1111's `.yaml` model-config code-execution path (C
 
 - Use it only on your home network. Do not forward its port to the internet.
 - Change the default password, and use HTTPS (the default).
+- For two-factor login or passkeys, put an authenticating reverse proxy such as [Authelia](https://www.authelia.com/) or [Authentik](https://goauthentik.io/) in front. The WebUI itself only supports a username and password.
 - Only add models and extensions from sources you trust.
 - Update when a new image is published.
 
@@ -141,7 +148,7 @@ Before you start, make sure you have:
 
 | Requirement | Details |
 |---|---|
-| **Unraid** | Version 6.12+ recommended |
+| **Unraid** | Built and used on Unraid 7.3.4. Older versions may work if the NVIDIA Driver plugin offers driver 580 or newer for them. |
 | **NVIDIA GPU** | Turing architecture or newer (RTX 20-series, GTX 16-series, or later). Maxwell, Pascal, and Volta are no longer supported by CUDA 13. |
 | **NVIDIA driver** | **≥ 580** on the host (CUDA 13.0 requirement). Install the [Nvidia-Driver plugin](https://forums.unraid.net/topic/98978-plugin-nvidia-driver/) from Community Applications if you have not already. |
 | **Disk space** | The image itself is large (Python, PyTorch and CUDA libraries are built in), so leave room in your Docker storage. On the path you map to `/data`, plan for models: a single model can be 2–7 GB. SSD storage is strongly recommended. |
@@ -197,7 +204,7 @@ The included Unraid template sets `--runtime=nvidia` in Extra Parameters by defa
    - Host: `https://<unraid-ip>:7860`
    - Custom network: `https://<container-ip>:7860`
 
-   Replace the IP and port with your actual values. Unraid's default hostname `tower.local` also works if mDNS is set up. Note the **https**: plain `http://` does not work while HTTPS is on. The first time, your browser warns about the self-signed certificate; see [HTTPS / TLS](#https--tls).
+   You can also use a hostname instead of the IP, for example `https://tower.local:7860` (Unraid's default name, if your network resolves it) or your own DNS name. Add that name to `WEBUI_TLS_HOSTNAMES` so the certificate matches it. Note the **https**: plain `http://` does not work while HTTPS is on. The first time, your browser warns about the self-signed certificate; see [HTTPS / TLS](#https--tls).
 
 If you build your own image, the Dockerfile pins a Forge Neo release through `WEBUI_TAG` and `WEBUI_REF` (that release's commit). These are build-time settings for image builders, not runtime variables. See [Upstream version pinning](#upstream-version-pinning).
 
@@ -219,7 +226,7 @@ Version: neo 2.31
 HTTPS enabled with a self-signed certificate. Your browser will warn once; compare this fingerprint before accepting:
   SHA-256 fingerprint: 8B:56:E7:...
 ...
-Launching Web UI with arguments: --listen --port 7860 --data-dir /data --gradio-auth-path <redacted> --tls-keyfile /config/tls/selfsigned.key --tls-certfile /config/tls/selfsigned.crt
+Launching Web UI with arguments: --listen --port 7860 --data-dir /data --enable-insecure-extension-access --gradio-auth-path <redacted> --tls-keyfile /config/tls/selfsigned.key --tls-certfile /config/tls/selfsigned.crt
 ...
 Running on local URL: https://localhost:7860
 ```
@@ -229,7 +236,7 @@ A `[READY]` box appears once the WebUI accepts connections. If the container fin
 ### What if something goes wrong?
 
 - Extensions can install their own Python packages on start. Those go to `/data/python-user`, never into the image. If an extension breaks things (for example by installing a different PyTorch), delete that folder on the host and restart. The container checks the PyTorch version on every start and tells you when this happens.
-- If the log says `config.json is from an older WebUI version`, the container stopped on purpose. Move `config.json` and `ui-config.json` out of the appdata `webui/` folder and restart. See [Migration Notes](#migration-notes).
+- If you reuse settings from an older WebUI (for example AUTOMATIC1111), Forge Neo cannot use them. The container moves `config.json` and `ui-config.json` aside as dated backups (`*.pre-neo-<date>.bak`, in the appdata `webui/` folder), starts with default settings, and says so in the log. Nothing is deleted.
 
 ---
 
@@ -239,37 +246,36 @@ After the container starts, you will see a login page. Log in with `admin` / `ch
 
 You need at least one model (checkpoint) to generate images. Models are usually `.safetensors` files (Neo also loads `.gguf` and `.ckpt`), typically 2–7 GB each. Forge Neo also runs newer model families such as Flux, Qwen and Wan.
 
-### Recommended: install a CivitAI browser extension
+### Option: a CivitAI browser extension
+
+A CivitAI browser extension lets you search [CivitAI](https://civitai.com/) and download models straight into the right folder from inside the WebUI. This is how I do it.
 
 > [!NOTE]
-> Managing extensions from the WebUI needs `--enable-insecure-extension-access` in `COMMANDLINE_ARGS`. It is off by default. See [Extension management is off by default](#extension-management-is-off-by-default) for the trade-off. Also check that an extension supports Forge Neo before installing it: many A1111 extensions need a Neo-specific fork.
+> I am not affiliated with any of these projects and do not vouch for their code. This is just the process I use. Extensions run their own code inside the container, so review an extension before you install it.
 
-The easiest way to browse and download models is with a CivitAI browser extension, which lets you search and download models from [CivitAI](https://civitai.com/) directly inside the WebUI.
+**Extensions and Forge Neo, in short:**
 
-**Recommended:** [CivBrowser](https://github.com/SignalFlagZ/sd-webui-civbrowser) by SignalFlagZ. Actively maintained, supports searching and downloading models across multiple tabs.
+- Many AUTOMATIC1111 extensions do not work on Forge Neo. Often someone has made a fork (a modified copy) for Neo, so search GitHub for the extension's name plus "neo" or "forge".
+- The community keeps a list of Neo-compatible forks: [Extensions for Forge Neo](https://github.com/Haoming02/sd-webui-forge-classic/discussions/1128) (a discussion in the Forge Neo repository, maintained by a user, not by Haoming02). Start there.
+- The **Extensions → Available** tab lists the AUTOMATIC1111 extension index, not Neo forks (checked in the Forge Neo 2.31 source). Use **Install from URL** for Neo forks.
+- Forge Neo's own README says it ignores issues about third-party extensions, so report extension problems to the extension's author.
 
-**Alternative:** [CivitAI Browser+](https://github.com/BlafKing/sd-civitai-browser-plus) by BlafKing. Feature-rich (download, delete, scan for updates, tag management, multi-threaded downloads). Note: this repository is **archived** and no longer receiving updates.
+**CivitAI browser extensions I know of (as of 2026-10-29):**
+
+| Extension | Forge Neo? | Notes |
+|---|---|---|
+| [CivitAI Browser Neo](https://github.com/eduardoabreu81/sd-civitai-browser-neo) | Made for Forge Neo | Rebuilt from CivitAI Browser+ for Neo. The one I use. |
+| [CivBrowser](https://github.com/SignalFlagZ/sd-webui-civbrowser) | "Experimental" per its README | Actively updated. Not tested here. |
+| [CivitAI Browser+](https://github.com/BlafKing/sd-civitai-browser-plus) | No | Archived on GitHub (no more updates). Listed so you know why to skip it. |
 
 > [!WARNING]
-> Neither extension has been tested with Forge Neo in this container yet. Both were written for AUTOMATIC1111. Look for a Neo-compatible fork first.
+> In April 2026 CivitAI moved its adult content to a separate domain (`civitai.red`), and some extensions could no longer download from there ([example report](https://github.com/eduardoabreu81/sd-civitai-browser-neo/issues/6)). CivitAI changes break these extensions from time to time; check the extension's issue tracker if downloads fail.
 
-#### Installing from the Available tab (easiest)
+#### Installing an extension from its URL
 
-1. In the WebUI, go to the **Extensions** tab.
-2. Click the **Available** sub-tab.
-3. Click **Load from:** to load the extension index.
-4. Use the search box to filter by name (e.g. `CivBrowser` or `CivitAI Browser+`).
-5. Click **Install** next to the extension you want.
-6. Go to **Installed** → click **Apply and restart UI**.
-7. A new tab will appear for the extension. Browse models and click download. They are saved directly to the right folder.
-
-#### Alternative: Install from URL
-
-If you prefer, you can paste a GitHub URL directly:
-
-1. In the **Extensions** tab, click **Install from URL**.
-2. Paste the repository URL (e.g., `https://github.com/SignalFlagZ/sd-webui-civbrowser.git`).
-3. Click **Install**, then go to **Installed** → **Apply and restart UI**.
+1. In the WebUI, go to **Extensions** → **Install from URL**.
+2. Paste the extension's repository URL, for example `https://github.com/eduardoabreu81/sd-civitai-browser-neo.git`.
+3. Click **Install**, then go to **Installed** → **Apply and restart UI**. The container restarts the WebUI for you (see [Automatic restart](#automatic-restart)).
 
 ### Manual download
 
@@ -278,12 +284,13 @@ If you prefer to download models manually:
 1. Download a `.safetensors` file from [CivitAI](https://civitai.com/), [Hugging Face](https://huggingface.co/), or another trusted source.
 2. Place it in the models directory on your Unraid host:
    ```
-   /mnt/user/ai/data/models/Stable-diffusion/
+   <data-path>/models/Stable-diffusion/
    ```
+   `<data-path>` means the host folder you mapped to `/data` (the template default is `/mnt/user/ai/data`).
    You can copy files via SMB share, SCP, or the Unraid terminal:
    ```bash
    # Example: download a model via the Unraid terminal
-   wget -P /mnt/user/ai/data/models/Stable-diffusion/ <model-download-url>
+   wget -P <data-path>/models/Stable-diffusion/ <model-download-url>
    ```
 3. In the WebUI, click the **refresh** button next to the checkpoint dropdown (top left) to detect the new model, then select it.
 
@@ -316,7 +323,7 @@ The container uses two main mount points. Here is where everything lives:
     ├── selfsigned.crt / .key     Created automatically
     └── custom.crt / .key         Optional: your own certificate
 
-/data/                            (host: /mnt/user/ai/data/)
+/data/                            (host: <data-path>, template default /mnt/user/ai/data/)
 ├── models/
 │   ├── Stable-diffusion/         Model checkpoints (.safetensors, .gguf, .ckpt)
 │   ├── VAE/                      VAE models
@@ -370,7 +377,7 @@ viewer:another-password
 Lines starting with `#` are comments. Blank lines are ignored.
 
 <details>
-<summary><strong>Auth file details: permissions, SMB access, API mirroring</strong></summary>
+<summary><b>🔽 Click to expand: Auth file details: permissions, SMB access, API mirroring</b></summary>
 
 #### File permissions
 
@@ -415,7 +422,7 @@ If `--api-auth` is provided without `--api`, startup logs now warn that API auth
 **Default** (from the Unraid template):
 
 ```
---listen --port 7860 --data-dir /data
+--listen --port 7860 --data-dir /data --enable-insecure-extension-access
 ```
 
 > [!WARNING]
@@ -431,11 +438,11 @@ Use the defaults as a starting point, then tune for your own hardware, risk tole
 For a complete list of supported arguments, see the [Forge Neo README](https://github.com/Haoming02/sd-webui-forge-classic/tree/neo).
 
 <details>
-<summary><strong>Flag details and security considerations</strong></summary>
+<summary><b>🔽 Click to expand: Flag details and security considerations</b></summary>
 
 - **Attention (`--xformers`, `--sage`, `--flash`)** (not set by default): The image ships without these packages, so Neo uses PyTorch's built-in attention, which Neo's README calls "usually as fast, and also more stable". These flags only *install* the package (into `/data/python-user`) on the next start. Once installed, Neo uses it automatically. Use `--disable-xformers` (and so on) to switch one off again.
 
-- **`--enable-insecure-extension-access`** (not set by default): Allows installing/updating extensions from the WebUI. Risk: anyone who can log in can install an extension from any git URL, and its code runs inside the container on every start. Manage extensions on disk instead for a safer posture.
+- **`--enable-insecure-extension-access`** (set by default): Allows installing/updating extensions from the WebUI. Risk: anyone who can log in can install an extension from any git URL, and its code runs inside the container on every start. Remove it for a safer posture and manage extensions on disk.
 
 - **`--api`** (not set by default): Enables the REST API. Only add this when you explicitly need programmatic access.
 
@@ -445,7 +452,7 @@ If you change these arguments, keep in mind that some flags can weaken the conta
 
 ### HTTPS / TLS
 
-HTTPS is **on by default** (`WEBUI_TLS=auto`). On the first start, the container creates a self-signed certificate in `/config/tls/` and serves the WebUI over `https://`.
+HTTPS is **on by default** (`WEBUI_TLS=auto`). This is this container's own feature, not part of Forge Neo (Forge Neo only accepts certificate files you hand it). On the first start, the container creates a self-signed certificate in `/config/tls/` and serves the WebUI over `https://`.
 
 **The first visit:** your browser warns that the certificate is not trusted, because no public authority signed it. Before you accept, compare the certificate's SHA-256 fingerprint (in the browser's certificate details) with the one printed in the container log. If they match, you are talking to your own container. Accept the warning once per browser.
 
@@ -491,7 +498,7 @@ This image uses Unraid-friendly defaults:
 Make sure your mapped host paths are writable by that UID/GID, or adjust the container settings to match your environment.
 
 <details>
-<summary><strong>File permissions and umask</strong></summary>
+<summary><b>🔽 Click to expand: File permissions and umask</b></summary>
 
 By default, this container does not set a restrictive `UMASK`, so files in `/data` remain easier to access from outside the container.
 
@@ -527,7 +534,7 @@ This container uses the following security options by default (set in the Unraid
 For the full security baseline regression checklist, see `SECURITY.md`. To run the automated checks: `./scripts/security-check.sh`
 
 <details>
-<summary><strong>What each security flag does</strong></summary>
+<summary><b>🔽 Click to expand: What each security flag does</b></summary>
 
 - **`--read-only`**: Reduces write access to the container filesystem, limiting persistence for attackers.
 - **`--tmpfs /tmp:...`**: Provides a safe, writable /tmp for runtime needs.
@@ -564,7 +571,9 @@ The image includes a built-in `HEALTHCHECK` that probes whether the Gradio HTTP 
 
 ### Automatic restart
 
-The container automatically restarts the WebUI process if it exits. You do not need to restart the container itself.
+The container automatically restarts the WebUI process if it exits, so you do not have to restart the container yourself.
+
+**Why this matters:** in most WebUI containers, the WebUI *is* the container's main process. When it exits, the container stops. That happens after a crash, and also every time you click **Apply and restart UI** after installing an extension, because the WebUI shuts itself down expecting a launcher to start it again. You would then have to go to the Unraid Docker page and start the container by hand. Here, `start.sh` acts as that launcher: it notices the exit and starts the WebUI again within seconds.
 
 - **Restart button** (in the WebUI, or after installing an extension): the WebUI exits cleanly (code 0). The container waits `RESTART_DELAY` seconds (default 5 s) then relaunches it.
 - **Settings need attention** (exit code 78, for example an old `config.json`): the container exits instead of restarting, and the log explains the fix.
@@ -591,7 +600,6 @@ The container automatically restarts the WebUI process if it exits. You do not n
 - Check the container logs. The container prints a pre-launch summary and annotates known harmless warnings inline, so look past those to find real errors.
 - Confirm the port mapping is correct (Bridge mode) or that you are using the right IP (custom network mode).
 - Confirm the container is still running.
-- If the container exited with a message about `config.json`, see [Migration Notes](#migration-notes).
 - If the log mentions an unrecognized argument, remove that flag from `COMMANDLINE_ARGS`. Forge Neo stops on unknown flags.
 
 ### The WebUI loads but cannot generate
@@ -603,7 +611,7 @@ The container automatically restarts the WebUI process if it exits. You do not n
 - Confirm Unraid is providing GPU access to the container.
 - Confirm the host NVIDIA driver/plugin is working.
 - If the WebUI fails with a message like `PyTorch is not able to access any compute device (GPU)`, you can temporarily add `--skip-torch-cuda-test` to `COMMANDLINE_ARGS` for troubleshooting. I do not recommend making that your long-term default, because it can hide a real GPU passthrough problem.
-- If the startup sanity check reports a torch version mismatch, an extension replaced PyTorch. Delete `/mnt/user/ai/data/python-user` (template default path) and restart.
+- If the startup sanity check reports a torch version mismatch, an extension replaced PyTorch. Delete `<data-path>/python-user` and restart.
 
 ### I am seeing permission errors
 - Check that your mapped host folders are writable by the configured UID/GID.
@@ -617,13 +625,13 @@ The container automatically restarts the WebUI process if it exits. You do not n
 - Fix on host first, then restart:
 
 ```bash
-chown nobody:users /mnt/user/ai/data
-chmod 775 /mnt/user/ai/data
+chown nobody:users <data-path>
+chmod 775 <data-path>
 ```
 
 ### The container fails to start after deleting `/data`
 
-If you delete the host data directory (default: `/mnt/user/ai/data/`), Docker may recreate it owned by `root` on next start.
+If you delete the host data directory (`<data-path>`), Docker may recreate it owned by `root` on next start.
 
 **In most cases this is fully automatic.** The container entrypoint runs as root, detects the wrong ownership, corrects it, then drops to the unprivileged app user before startup continues. You should see a log line like:
 
@@ -636,8 +644,8 @@ If you delete the host data directory (default: `/mnt/user/ai/data/`), Docker ma
 **If the auto-fix fails** (NFS shares with root squash, unusual SELinux policies, or other host-side restrictions), correct ownership manually on the Unraid host and restart:
 
 ```bash
-chown nobody:users /mnt/user/ai/data
-chmod 775 /mnt/user/ai/data
+chown nobody:users <data-path>
+chmod 775 <data-path>
 ```
 
 ### The container is unhealthy
@@ -651,7 +659,7 @@ chmod 775 /mnt/user/ai/data
 
 | Variable | Default | Description |
 |---|---|---|
-| `COMMANDLINE_ARGS` | `--listen --port 7860 --data-dir /data` | Arguments passed directly to the WebUI launch command |
+| `COMMANDLINE_ARGS` | `--listen --port 7860 --data-dir /data --enable-insecure-extension-access` | Arguments passed directly to the WebUI launch command |
 | `WEBUI_AUTH_FILE` | `/config/auth/webui-auth.txt` | Path to the managed authentication credentials file |
 | `API_AUTH_FILE_MODE` | `disabled` | Set to `mirror-webui-file` to copy WebUI creds to `--api-auth` when `--api` is enabled |
 | `RESTART_ON_EXIT` | `1` | `1` = restart WebUI after any exit; `0` = exit container on WebUI stop |
@@ -672,25 +680,26 @@ chmod 775 /mnt/user/ai/data
 
 This is a new project. The old AUTOMATIC1111 container ([aegisnir/A1111-unraid](https://github.com/aegisnir/A1111-unraid)) and its image stay where they are, so existing installs keep working. To switch, add this template as a new container. Your models in `/data` work as they are.
 
-- **Settings:** if you point this container at the old appdata folder, it renames `/config/a1111` to `/config/webui` on first start. Forge Neo then stops with a message, because A1111 settings are not compatible. Move `config.json` and `ui-config.json` out of the appdata `webui/` folder and restart.
+- **Settings:** if you point this container at the old appdata folder, it renames `/config/a1111` to `/config/webui` on first start. A1111 settings are not compatible with Forge Neo, so the container then backs up `config.json` and `ui-config.json` (`*.pre-neo-<date>.bak`) and starts with defaults. The log lists the backup files.
 - **Outputs:** Neo saves to `/data/output` (A1111 used `/data/outputs`). Your old images stay where they are. To keep using the old folder, set it in **Settings → Paths for Saving**.
 - **Old Python files:** `/data/venv` and `/data/repositories` are no longer used. The container leaves them alone. Delete them to free space.
 - **Extensions:** many A1111 extensions do not work on Neo. Check each one for a Neo version.
-- **Flags:** `--xformers` is no longer a default (see [`COMMANDLINE_ARGS`](#commandline_args)). `--no-download-sd-model`, `--disable-safe-unpickle` and `--allow-code` are removed by Neo and dropped automatically.
+- **Flags:** `--enable-insecure-extension-access` is now a default (the old container had extension installs off). `--xformers` is no longer a default (see [`COMMANDLINE_ARGS`](#commandline_args)). `--no-download-sd-model`, `--disable-safe-unpickle` and `--allow-code` are removed by Neo and dropped automatically.
 
 ### Coming from another Forge Neo container
 
 Your `config.json` already has Neo's version marker, so settings carry over. The entrypoint changes `/data` ownership to `99:100` on first start. If the old container ran as another user, test with a **copy** of the data first, because the old container may not be able to write to it afterwards.
 
-### Extension management is off by default
+### Extension management is on by default
 
-The WebUI blocks installing extensions from its Extensions tab when it is reachable over the network (`--listen`). This container keeps that block on. The old A1111 container turned it off by default.
+The WebUI normally blocks installing extensions from its Extensions tab when it is reachable over the network (`--listen`). This container turns that block **off** by default with `--enable-insecure-extension-access`, because installing extensions from the WebUI is how most people use it. (The old A1111 container had it off.)
 
-**How to turn it on:** add `--enable-insecure-extension-access` to `COMMANDLINE_ARGS` (the template's Extra Args). This is an explicit opt-in to the security trade-off.
+> [!WARNING]
+> With it on, **anyone who can log in can install an extension from any git URL, and that extension runs its own code inside the container** on every start. Protect your login: change the default password, keep the WebUI off the internet, and use HTTPS.
 
-**Why it is off:** extensions run their own code inside the container. With the flag on, anyone who can log in can install one from any git URL.
+**How to turn it off:** remove `--enable-insecure-extension-access` from `COMMANDLINE_ARGS` (the template's Extra Args). The Extensions tab then only shows what is installed.
 
-**Alternative:** install extensions from the host by cloning them into `/data/extensions/`, then restart the container. This does not need the flag.
+**Installing without the WebUI:** clone an extension into `<data-path>/extensions/` from the Unraid terminal, then restart the container. This works with the flag on or off.
 
 ## Advanced Topics
 
@@ -708,6 +717,23 @@ To build a different release yourself:
 ```bash
 docker build --build-arg WEBUI_TAG=<tag> --build-arg WEBUI_REF=<commit-sha> -t sd-webui-forge-neo-unraid:local .
 ```
+
+### Build with the original Gradio 4.40.0
+
+If Gradio 4.44.1 breaks something for you, you can build your own image with Forge Neo's original Gradio 4.40.0. This brings back the 5 vulnerabilities that 4.44.1 fixes (see [Known security issues](#known-security-issues)). You need a machine with Docker and about 30 GB of free space; the Unraid terminal works.
+
+1. Download this repository and go into it:
+   ```bash
+   git clone https://github.com/aegisnir/sd-webui-forge-neo-unraid.git
+   cd sd-webui-forge-neo-unraid
+   ```
+2. Build the image with the older Gradio. This takes a while and downloads several GB:
+   ```bash
+   docker build --build-arg GRADIO_VERSION=4.40.0 -t sd-webui-forge-neo-unraid:gradio-4.40.0 .
+   ```
+3. In Unraid, edit the container and set **Repository** to `sd-webui-forge-neo-unraid:gradio-4.40.0`, then **Apply**.
+
+Unraid's "update available" check does not work for an image you built yourself; rebuild it to update.
 
 ### Image tags
 
@@ -739,10 +765,10 @@ The image pins `torch` and `torchvision` to the versions Forge Neo itself instal
 | **Default WebUI URL** | `https://<unraid-ip>:7860` (self-signed certificate) |
 | **Default login** | `admin` / `changeme` |
 | **Auth file (host)** | `/mnt/user/appdata/SD-WebUI-Forge-Neo-Unraid/auth/webui-auth.txt` |
-| **Models directory (host)** | `/mnt/user/ai/data/models/Stable-diffusion/` |
-| **Outputs directory (host)** | `/mnt/user/ai/data/output/` |
+| **Models directory (host)** | `<data-path>/models/Stable-diffusion/` |
+| **Outputs directory (host)** | `<data-path>/output/` |
 | **Config directory (host)** | `/mnt/user/appdata/SD-WebUI-Forge-Neo-Unraid/` |
-| **Data directory (host)** | `/mnt/user/ai/data/` |
+| **Data directory (host)** | `<data-path>` (template default `/mnt/user/ai/data/`) |
 | **Container UID/GID** | `99` / `100` (`nobody` / `users`) |
 | **Minimum driver** | ≥ 580 (CUDA 13.0 requirement) |
 | **Start time** | Usually 1–2 minutes (no downloads at startup) |

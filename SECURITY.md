@@ -114,6 +114,10 @@ grep -n 'umask 077' start.sh
 - [ ] PASS if image builds authenticate with the workflow's `GITHUB_TOKEN`, not a personal access token.
 - [ ] PASS if every `.trivyignore` vulnerability entry has a reason comment and an `exp:` date, and is listed in the README "Known security issues" section.
 
+### Extensions
+
+- [ ] PASS if the README section "Extension management is on by default" exists and warns that anyone who can log in can install code, since `--enable-insecure-extension-access` is in the default args (owner decision, 2026-10-29).
+
 ### HTTPS
 
 - [ ] PASS if `WEBUI_TLS` defaults to `auto` (HTTPS on) in both the Dockerfile/start.sh and `template.xml`.
