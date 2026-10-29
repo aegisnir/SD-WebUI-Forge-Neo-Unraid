@@ -22,6 +22,9 @@ I couldn't find a Forge Neo container built for Unraid, so I made one. I had bee
 
 This is a personal hobby project and it is heavily AI-assisted. This is also a learning experience for me as I have never made my own container before or produced anything on this scale for others. I care a lot about security and I am trying to make thoughtful choices, but I am not a programmer or security expert, so mistakes and inaccuracies are likely. If you notice something I could do better, please let me know. I welcome constructive criticism and feedback, and I am willing to learn and correct my mistakes. Thank you for your interest and I hope you find this useful.
 
+> [!WARNING]
+> **This container ships software with known, unfixed vulnerabilities**, mainly in Gradio, the web framework Forge Neo is built on. They are all listed in [Known security issues](#known-security-issues), with what this container does about them. Please read that section before you install.
+
 > [!CAUTION]
 > Public internet exposure is **not** the intended use case.
 > If you expose this beyond a trusted network, the risk profile changes significantly and you should make those decisions carefully for your own environment.
@@ -30,6 +33,7 @@ This is a personal hobby project and it is heavily AI-assisted. This is also a l
 
 ## Table of Contents
 
+- [Known security issues](#known-security-issues)
 - [Prerequisites](#prerequisites)
 - [Quick Start](#quick-start)
 - [First Launch: What to Expect](#first-launch-what-to-expect)
@@ -38,7 +42,7 @@ This is a personal hobby project and it is heavily AI-assisted. This is also a l
 - [Configuration](#configuration)
   - [Authentication](#authentication-defaults)
   - [COMMANDLINE_ARGS](#commandline_args)
-  - [HTTPS / TLS](#https--tls-options)
+  - [HTTPS / TLS](#https--tls)
   - [Data Directory](#--data-dir)
 - [Storage and Permissions](#storage-and-permissions)
 - [Security Hardening](#security-hardening-defaults)
@@ -47,6 +51,87 @@ This is a personal hobby project and it is heavily AI-assisted. This is also a l
 - [Advanced Topics](#advanced-topics)
 - [Quick Reference](#quick-reference)
 - [Licensing and Third-Party Notices](#licensing-and-third-party-notices)
+
+---
+
+## Known security issues
+
+I want to be upfront about this: the WebUI in this container depends on software with known vulnerabilities that I cannot fully fix. Everything I know of is listed here. The newest check was on 2026-10-29.
+
+### The main problem: Forge Neo is built on Gradio 4
+
+Forge Neo 2.31 pins **Gradio 4.40.0**, the web framework that draws the whole UI. Gradio 4.40.0 has **28 published vulnerabilities**, including one rated critical. Gradio fixed most of them only in versions 5 and 6, and Forge Neo's UI code does not work with those. Some have no fix in any version. This is an upstream limitation: it also affects every other way of running Forge Neo, not just this container.
+
+### What this container does about it
+
+- **Mitigation attempt (may break things):** this image upgrades Gradio from 4.40.0 to **4.44.1**, the last Gradio 4 release. That fixes 5 of the 28 ([CVE-2024-47084](https://osv.dev/vulnerability/CVE-2024-47084), a high-rated CORS bypass, plus [CVE-2024-47166](https://osv.dev/vulnerability/CVE-2024-47166), [CVE-2024-47168](https://osv.dev/vulnerability/CVE-2024-47168), [CVE-2024-47869](https://osv.dev/vulnerability/CVE-2024-47869) and [CVE-2024-48052](https://osv.dev/vulnerability/CVE-2024-48052)). Forge Neo itself is not tested with 4.44.1, so parts of the UI might misbehave. If you hit a problem, please [open an issue](https://github.com/aegisnir/sd-webui-forge-neo-unraid/issues). Image builders can go back with `--build-arg GRADIO_VERSION=4.40.0`.
+- **Login is always on**, and it is managed by the container (see [Authentication](#authentication-defaults)).
+- **HTTPS is on by default**, so logins and images are encrypted on your network (see [HTTPS / TLS](#https--tls)).
+- **Installing extensions from the WebUI is off by default**, and the container runs with a read-only filesystem, no root, and dropped privileges (see [Security Hardening](#security-hardening-defaults)).
+- **The build still scans every image** with Trivy and refuses to publish on new high or critical findings. The Gradio vulnerabilities below are accepted one by one in [`.trivyignore`](.trivyignore), each with its reason. Every entry expires on 2027-01-31, which forces a fresh review.
+
+### Remaining Gradio 4.44.1 vulnerabilities
+
+Some of these concern Gradio features this WebUI may not use (share links through FRP, OAuth login, Windows-only paths, `gr.load`). I have not verified that one by one, so all of them are listed. "Fixed in" is the first Gradio version with the fix; "none" means there is no fix yet.
+
+| Severity | ID | Summary | Fixed in |
+|---|---|---|---|
+| Critical | [CVE-2025-23042](https://osv.dev/vulnerability/CVE-2025-23042) | Gradio Blocked Path ACL Bypass Vulnerability | 5.6.0 |
+| High | [CVE-2024-10569](https://osv.dev/vulnerability/CVE-2024-10569) | Gradio Vulnerable to Denial of Service (DoS) via Crafted Zip Bomb | none |
+| High | [CVE-2024-10624](https://osv.dev/vulnerability/CVE-2024-10624) | Gradio Vulnerable to Denial of Service (DoS) via Crafted HTTP Request | none |
+| High | [CVE-2024-10648](https://osv.dev/vulnerability/CVE-2024-10648) | Gradio Vulnerable to Arbitrary File Deletion | none |
+| High | [CVE-2024-47867](https://osv.dev/vulnerability/CVE-2024-47867) | Gradio lacks integrity checking on the downloaded FRP client | 5.0.0 |
+| High | [CVE-2024-47870](https://osv.dev/vulnerability/CVE-2024-47870) | Gradio has a race condition in update_root_in_config may redirect user traffic | 5.0.0 |
+| High | [CVE-2024-47871](https://osv.dev/vulnerability/CVE-2024-47871) | Gradio uses insecure communication between the FRP client and server | 5.0.0 |
+| High | [CVE-2024-8966](https://osv.dev/vulnerability/CVE-2024-8966) | Gradio DOS in multipart boundry while uploading the file | none |
+| High | [CVE-2026-28414](https://osv.dev/vulnerability/CVE-2026-28414) | Gradio is Vulnerable to Absolute Path Traversal on Windows with Python 3.13+ | 6.7.0 |
+| High | [CVE-2026-28416](https://osv.dev/vulnerability/CVE-2026-28416) | Gradio has SSRF via Malicious `proxy_url` Injection in `gr.load()` Config Processing | 6.6.0 |
+| High | [CVE-2026-48545](https://osv.dev/vulnerability/CVE-2026-48545) | Gradio contains a cookie injection vulnerability | 6.15.0 |
+| High | [CVE-2026-49119](https://osv.dev/vulnerability/CVE-2026-49119) | Gradio FileExplorer preprocess path traversal allows files outside root_dir to reach callbacks | 6.16.0 |
+| Moderate | [CVE-2024-12217](https://osv.dev/vulnerability/CVE-2024-12217) | Gradio Path Traversal vulnerability | none |
+| Moderate | [CVE-2024-47164](https://osv.dev/vulnerability/CVE-2024-47164) | Gradio's `is_in_or_equal` function may be bypassed | 5.0.0 |
+| Moderate | [CVE-2024-47165](https://osv.dev/vulnerability/CVE-2024-47165) | Gradio's CORS origin validation accepts the null origin | 5.0.0 |
+| Moderate | [CVE-2024-47167](https://osv.dev/vulnerability/CVE-2024-47167) | Gradio vulnerable to SSRF in the path parameter of /queue/join | 5.0.0 |
+| Moderate | [CVE-2024-47868](https://osv.dev/vulnerability/CVE-2024-47868) | Gradio has several components with post-process steps allow arbitrary file leaks | 5.0.0 |
+| Moderate | [CVE-2024-47872](https://osv.dev/vulnerability/CVE-2024-47872) | Gradio has an XSS on every Gradio server via upload of HTML files, JS files, or SVG files | 5.0.0 |
+| Moderate | [CVE-2025-48889](https://osv.dev/vulnerability/CVE-2025-48889) | Gradio Allows Unauthorized File Copy via Path Manipulation | 5.31.0 |
+| Moderate | [CVE-2026-28415](https://osv.dev/vulnerability/CVE-2026-28415) | Gradio has an Open Redirect in its OAuth Flow | 6.6.0 |
+| Low | [CVE-2026-10783](https://osv.dev/vulnerability/CVE-2026-10783) | Gradio: Audio cache key ignores metadata when saving numpy audio outputs | 6.15.1 |
+| Low | [CVE-2026-27167](https://osv.dev/vulnerability/CVE-2026-27167) | Gradio: Mocked OAuth Login Exposes Server Credentials and Uses Hardcoded Session Secret | 6.6.0 |
+| Low | [GHSA-26jh-r8g2-6fpr](https://osv.dev/vulnerability/GHSA-26jh-r8g2-6fpr) | Gradio's dropdown component pre-process step does not limit the values to those in the dropdown list | 5.0.0 |
+
+Source: [OSV](https://osv.dev/list?ecosystem=PyPI&q=gradio), package `gradio`, version 4.44.1.
+
+### Forge Neo issues (not Gradio)
+
+Found in a review of Forge Neo 2.31 and not fixed by this container:
+
+- **Stored XSS in the extra-networks cards** (`modules/ui_extra_networks.py`): model file names and search terms are not escaped. A model with a crafted file name or metadata could run script in your browser. Same pattern as AUTOMATIC1111's CVE-2026-111984.
+- **No size limit when reading `.safetensors` metadata** (`modules/sd_models.py`): a crafted model file can use a lot of memory. Same pattern as AUTOMATIC1111's CVE-2026-111985.
+
+Forge Neo did remove AUTOMATIC1111's `.yaml` model-config code-execution path (CVE-2026-111986), and it always loads checkpoints with PyTorch's safer `weights_only=True` mode.
+
+### Risks from how this container works
+
+| Risk | Why it exists | What you can do |
+|---|---|---|
+| Default login `admin` / `changeme` on first start | So the WebUI is never without a login | Change it right away. The log warns until you do. |
+| No limit on login attempts | Gradio has no rate limiting or lockout (confirmed on Gradio 3, assumed on 4) | Keep it on your LAN, or put a reverse proxy with rate limiting in front |
+| Extensions run their own code | That is how WebUI extensions work | Only install extensions you trust |
+| `/data/python-user` holds packages installed by extensions, and runs on every start | The image itself is read-only, so extension packages live here | If you suspect a problem, delete that folder. Extensions reinstall what they need. |
+| API password in an environment variable | Only if you enable the API **and** set `API_AUTH_FILE_MODE=mirror-webui-file`; the WebUI has no file option for API auth | Leave the API off unless you need it |
+| A compiler is included in the image | Some extensions compile code when they install | None needed; a compromised extension could already run code anyway |
+| A few packages installed by Forge Neo's built-in ControlNet preprocessors are not version-pinned | Forge Neo does not pin them | They are scanned with the rest of the image |
+| The build ignores vulnerabilities that have no fix yet | Otherwise no image could ever be published | The weekly scan still reports them |
+
+### How to keep your risk low
+
+- Use it only on your home network. Do not forward its port to the internet.
+- Change the default password, and use HTTPS (the default).
+- Only add models and extensions from sources you trust.
+- Update when a new image is published.
+
+If you find something I missed, please see [SECURITY.md](SECURITY.md) or open an issue.
 
 ---
 
@@ -108,11 +193,11 @@ The included Unraid template sets `--runtime=nvidia` in Extra Parameters by defa
 5. **Start the container.** Everything the WebUI needs is built into the image, so it usually starts in a minute or two. See [First Launch: What to Expect](#first-launch-what-to-expect) for what healthy logs look like.
 
 6. **Access the WebUI** from a trusted device on your LAN:
-   - Bridge: `http://<unraid-ip>:7860`
-   - Host: `http://<unraid-ip>:7860`
-   - Custom network: `http://<container-ip>:7860`
+   - Bridge: `https://<unraid-ip>:7860`
+   - Host: `https://<unraid-ip>:7860`
+   - Custom network: `https://<container-ip>:7860`
 
-   Replace the IP and port with your actual values. Unraid's default hostname `tower.local` also works if mDNS is set up.
+   Replace the IP and port with your actual values. Unraid's default hostname `tower.local` also works if mDNS is set up. Note the **https**: plain `http://` does not work while HTTPS is on. The first time, your browser warns about the self-signed certificate; see [HTTPS / TLS](#https--tls).
 
 If you build your own image, the Dockerfile pins a Forge Neo release through `WEBUI_TAG` and `WEBUI_REF` (that release's commit). These are build-time settings for image builders, not runtime variables. See [Upstream version pinning](#upstream-version-pinning).
 
@@ -131,9 +216,12 @@ Dependency sanity check: torch=2.14.0+cu130, torchvision=0.29.0+cu130
 ...
 Python 3.13.x ...
 Version: neo 2.31
-Launching Web UI with arguments: --listen --port 7860 --data-dir /data --gradio-auth-path <redacted>
+HTTPS enabled with a self-signed certificate. Your browser will warn once; compare this fingerprint before accepting:
+  SHA-256 fingerprint: 8B:56:E7:...
 ...
-Running on local URL: http://0.0.0.0:7860
+Launching Web UI with arguments: --listen --port 7860 --data-dir /data --gradio-auth-path <redacted> --tls-keyfile /config/tls/selfsigned.key --tls-certfile /config/tls/selfsigned.crt
+...
+Running on local URL: https://localhost:7860
 ```
 
 A `[READY]` box appears once the WebUI accepts connections. If the container finds no model, it says so before launch. That is **normal**. See [Getting Your First Model](#getting-your-first-model).
@@ -222,8 +310,11 @@ The container uses two main mount points. Here is where everything lives:
 │   ├── ui-config.json            UI layout/defaults
 │   ├── styles.csv                Prompt styles
 │   └── config_states/            Extension state snapshots
-└── auth/
-    └── webui-auth.txt            Login credentials (chmod 600)
+├── auth/
+│   └── webui-auth.txt            Login credentials (chmod 600)
+└── tls/                          HTTPS certificate and key (folder chmod 700)
+    ├── selfsigned.crt / .key     Created automatically
+    └── custom.crt / .key         Optional: your own certificate
 
 /data/                            (host: /mnt/user/ai/data/)
 ├── models/
@@ -352,34 +443,30 @@ If you change these arguments, keep in mind that some flags can weaken the conta
 
 </details>
 
-### HTTPS / TLS options
+### HTTPS / TLS
 
-By default, the WebUI serves over HTTP, not HTTPS. My recommended approach for most Unraid users:
+HTTPS is **on by default** (`WEBUI_TLS=auto`). On the first start, the container creates a self-signed certificate in `/config/tls/` and serves the WebUI over `https://`.
 
-1. Keep the container on a trusted local network.
-2. Leave the container itself on HTTP internally.
-3. Put HTTPS in front of it with a reverse proxy such as Nginx Proxy Manager, Traefik, Caddy, or another TLS-terminating proxy.
-4. Restrict exposure with a VPN, access controls, or both if you need remote access.
+**The first visit:** your browser warns that the certificate is not trusted, because no public authority signed it. Before you accept, compare the certificate's SHA-256 fingerprint (in the browser's certificate details) with the one printed in the container log. If they match, you are talking to your own container. Accept the warning once per browser.
 
-<details>
-<summary><strong>Direct TLS configuration</strong></summary>
+**How it works:**
 
-The WebUI does support direct TLS flags:
+- The certificate uses ECDSA P-256 and is valid for 825 days, the longest that Apple devices accept. It is renewed automatically 30 days before it expires.
+- The private key is created with owner-only permissions (`600`) inside a folder only the container user can open (`700`). It is never printed to the log.
+- The certificate covers `localhost`, `127.0.0.1`, the container's hostname, `WEBUI_HOST_IP` if you set it, and any names you list in `WEBUI_TLS_HOSTNAMES` (for example `tower.local,192.168.1.10`). Change that list and a new certificate is made on the next start. Entries that are not a plain hostname or IPv4 address stop startup with an error.
+- Certificate checks stay on. Other setups often add `--disable-tls-verify`; this container adds its certificate to the trust list Gradio uses instead, so Gradio's own startup check still verifies the connection.
+- The healthcheck and the `[READY]` banner work over HTTPS (the banner shows the `https://` address).
 
-- `--tls-certfile /path/to/cert.pem`
-- `--tls-keyfile /path/to/key.pem`
+**Use your own certificate:** put `custom.crt` (the certificate, plus any intermediate certificates) and `custom.key` in `/config/tls/` (on Unraid: `/mnt/user/appdata/SD-WebUI-Forge-Neo-Unraid/tls/`), then restart. The container checks that the key belongs to the certificate, refuses to start if it does not, and warns when the certificate is expired or expires within 30 days. Remove both files to go back to the self-signed certificate.
 
-You can mount certificate files into the container and add the TLS flags to `COMMANDLINE_ARGS`. I do not currently recommend making that the default because:
+**Turn HTTPS off:** set `WEBUI_TLS=off`. Logins and images then cross your network unencrypted.
 
-- You need to provide certificates and keys securely.
-- Certificate renewal is easier to manage outside the app.
-- Reverse proxies handle TLS, redirects, and hostname routing better than the WebUI itself.
-- Certificate management is highly environment-specific and easy to get wrong.
+**Manage it yourself:** if `COMMANDLINE_ARGS` contains `--tls-keyfile` or `--tls-certfile`, the container leaves HTTPS entirely to you.
 
-</details>
+**Reverse proxy:** if you put Nginx Proxy Manager, Traefik, Caddy or similar in front, you can either keep HTTPS on and point the proxy at `https://`, or set `WEBUI_TLS=off` and let the proxy handle HTTPS. Keep the proxy on your LAN or behind a VPN.
 
 > [!WARNING]
-> Avoid the Auto TLS-HTTPS extension. It was written for AUTOMATIC1111, and on Forge Neo it can crash startup on Python 3.13 (it pulls an old `trio` package).
+> Avoid the Auto TLS-HTTPS extension. It was written for AUTOMATIC1111, and on Forge Neo it can crash startup on Python 3.13 (it pulls an old `trio` package). The built-in HTTPS above replaces it.
 
 ### `--data-dir`
 
@@ -571,8 +658,10 @@ chmod 775 /mnt/user/ai/data
 | `RESTART_DELAY` | `5` | Seconds to wait before restarting after a clean exit |
 | `RESTART_DELAY_MAX` | `60` | Backoff ceiling (seconds) for crash restarts |
 | `RESTART_MAX_ATTEMPTS` | `0` | `0` = retry indefinitely; N = stop after N consecutive crash restarts |
+| `WEBUI_TLS` | `auto` | `auto` = HTTPS with your certificate or a self-signed one; `off` = plain HTTP. See [HTTPS / TLS](#https--tls). |
+| `WEBUI_TLS_HOSTNAMES` | *(unset)* | Extra hostnames or IPv4 addresses for the self-signed certificate, comma-separated |
 | `PYTHONUSERBASE` | `/data/python-user` | Where packages installed by extensions go |
-| `WEBUI_HOST_IP` | *(unset)* | Address shown in the `[READY]` log banner. Set it to your Unraid IP in bridge mode, where the container can't see it. It does not change where the WebUI listens. |
+| `WEBUI_HOST_IP` | *(unset)* | Address shown in the `[READY]` log banner, and added to the self-signed certificate. Set it to your Unraid IP in bridge mode, where the container can't see it. It does not change where the WebUI listens. |
 | `UMASK` | *(unset)* | Override default umask for all file creation (e.g., `022`) |
 | `NO_COLOR` | *(unset)* | Set to `1` to suppress ANSI color codes in container logs |
 | `TERM` | *(unset)* | Set to `dumb` to suppress ANSI color codes (alternative to `NO_COLOR`) |
@@ -639,7 +728,7 @@ This image will likely need occasional rebuilds to pick up upstream changes and 
 - NVIDIA driver/toolkit changes
 - Any extensions or models you add yourself
 
-The image pins `torch`, `torchvision` and `gradio` to the versions Forge Neo itself installs. When Neo changes them in a release, update the matching build arguments in the same pull request.
+The image pins `torch` and `torchvision` to the versions Forge Neo itself installs, and `gradio` one step newer (see [Known security issues](#known-security-issues)). When Neo changes them in a release, update the matching build arguments in the same pull request.
 
 ---
 
@@ -647,7 +736,7 @@ The image pins `torch`, `torchvision` and `gradio` to the versions Forge Neo its
 
 | Item | Value |
 |---|---|
-| **Default WebUI URL** | `http://<unraid-ip>:7860` |
+| **Default WebUI URL** | `https://<unraid-ip>:7860` (self-signed certificate) |
 | **Default login** | `admin` / `changeme` |
 | **Auth file (host)** | `/mnt/user/appdata/SD-WebUI-Forge-Neo-Unraid/auth/webui-auth.txt` |
 | **Models directory (host)** | `/mnt/user/ai/data/models/Stable-diffusion/` |

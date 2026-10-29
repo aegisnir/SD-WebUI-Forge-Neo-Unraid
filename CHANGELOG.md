@@ -36,6 +36,15 @@ release 2.31. Container hardening, auth handling, log redaction and the restart 
   scans it with Trivy (fail-closed), then publishes `:dev` / `:latest` / `:vX.Y.Z`.
   `scripts/build-push.sh` removed
 - **Upstream tracking**: daily workflow opens a PR when Neo tags a new release
+- **HTTPS on by default** (`WEBUI_TLS=auto`): self-signed ECDSA certificate in `/config/tls`,
+  renewed 30 days before expiry and when `WEBUI_TLS_HOSTNAMES` changes; bring your own with
+  `custom.crt` / `custom.key` (key/cert match checked); verification kept on via an
+  `SSL_CERT_FILE` trust bundle instead of `--disable-tls-verify`. `WEBUI_TLS=off` disables it
+- **gradio 4.40.0 → 4.44.1** (security mitigation, untested by Neo upstream, may break parts of
+  the UI): fixes 5 of 28 known CVEs. The remaining 23 are listed in the README
+  ("Known security issues") and accepted in `.trivyignore` with reasons and a 2027-01-31 expiry
+- **Build fix**: gradio and Neo's requirements are installed in two steps, as Neo does, because
+  gradio declares `Pillow<11` while Neo pins Pillow 13
 
 ### Security
 

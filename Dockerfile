@@ -95,7 +95,13 @@ ARG TORCHVISION_VERSION=0.29.0+cu130
 ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cu130
 
 # Packages Neo installs outside requirements.txt (same file, same function).
-ARG GRADIO_PACKAGES="gradio==4.40.0 gradio_rangeslider==0.0.8"
+# SECURITY MITIGATION, MAY BREAK: Neo 2.31 pins gradio 4.40.0, which has 28
+# known CVEs. 4.44.1 is the last 4.x release and fixes 5 of them. Neo's UI is
+# written for gradio 4.40, so this upgrade is not tested by upstream. If the
+# WebUI misbehaves, set GRADIO_VERSION=4.40.0 and rebuild. The remaining CVEs
+# are listed in README.md ("Known security issues") and .trivyignore.
+ARG GRADIO_VERSION=4.44.1
+ARG GRADIO_RANGESLIDER_VERSION=0.0.8
 ARG PACKAGING_VERSION=26.3
 ARG PIP_VERSION=26.2.2
 
@@ -156,6 +162,7 @@ ENV APP_GID="${APP_GID}"
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
   ca-certificates \
+  openssl \
   git \
   # build-essential: Required in final image (not just build stage) because
   # extensions compile C dependencies at runtime via pip install. Removing the
@@ -226,25 +233,31 @@ RUN git init -q "${WEBUI_DIR}" \
   && test "$(git -C "${WEBUI_DIR}" rev-parse HEAD)" = "${WEBUI_REF}" \
   && rm -rf "${WEBUI_DIR}/.git"
 
-# Install Neo's own requirements, then run Neo's environment preparation once
-# with --exit so built-in extension installers run now instead of at first start.
+# Install gradio, then Neo's own requirements, in two separate steps and in
+# that order, the same way Neo's launcher does. gradio declares Pillow<11 but
+# Neo pins Pillow 13; the second step overrides it, exactly as upstream does.
+# A single combined install would refuse to resolve. pip (not uv) is used here
+# because it installs the way Neo's launcher does.
+# Then run Neo's environment preparation once with --exit so built-in
+# extension installers run now instead of at first start.
 # --skip-torch-cuda-test: the build host has no GPU.
 # The last step fails the build if anything replaced the pinned torch.
 # compileall: "|| true" because a few bundled third-party files may not
 # compile on 3.13; Python then compiles those in memory when imported.
 WORKDIR ${WEBUI_DIR}
-# GRADIO_PACKAGES is a space-separated list, so it is left unquoted on purpose.
-# hadolint ignore=SC2086
-RUN uv pip install --python /usr/local/bin/python3 --break-system-packages \
-  ${GRADIO_PACKAGES} -r requirements.txt \
+# hadolint ignore=DL3013
+RUN python3 -m pip install --no-cache-dir --prefer-binary \
+  "gradio==${GRADIO_VERSION}" "gradio_rangeslider==${GRADIO_RANGESLIDER_VERSION}" \
+  && python3 -m pip install --no-cache-dir --prefer-binary -r requirements.txt \
   && mkdir -p /tmp/neo-build \
   && COMMANDLINE_ARGS="" python3 launch.py --skip-torch-cuda-test --skip-python-version-check \
   --data-dir /tmp/neo-build --exit \
   && rm -rf /tmp/neo-build "${WEBUI_DIR}/tmp" /root/.cache \
   && { python3 -m compileall -q "${WEBUI_DIR}" > /dev/null || true; } \
-  && python3 -c "import os, torch, torchvision, gradio; \
+  && GRADIO_VERSION="${GRADIO_VERSION}" python3 -c "import os, torch, torchvision, gradio; \
 assert torch.__version__ == os.environ['TORCH_VERSION'], torch.__version__; \
 assert torchvision.__version__ == os.environ['TORCHVISION_VERSION'], torchvision.__version__; \
+assert gradio.__version__ == os.environ['GRADIO_VERSION'], gradio.__version__; \
 print('torch', torch.__version__, 'torchvision', torchvision.__version__, 'gradio', gradio.__version__)"
 
 # uv is not needed at runtime.

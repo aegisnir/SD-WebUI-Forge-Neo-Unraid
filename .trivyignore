@@ -9,3 +9,67 @@
 # before exec-ing start.sh. Runtime hardening is applied at the Docker level
 # via template.xml: --cap-drop=ALL, --security-opt no-new-privileges:true, etc.
 DS002
+
+# ------------------------------------------------------------------------------
+# gradio 4.44.1: accepted known vulnerabilities (reviewed 2026-10-29)
+#
+# Forge Neo's UI is written for gradio 4.x. Most of these are fixed only in
+# gradio 5.x or 6.x, which Neo does not support; some have no fix at all.
+# This image already upgrades Neo's gradio 4.40.0 to 4.44.1 (the last 4.x
+# release), which fixes 5 more. The rest cannot be fixed here without breaking
+# the WebUI.
+#
+# They are ignored only so the build gate can pass. They are NOT hidden: every
+# one is listed with its impact in README.md, section "Known security issues".
+# Mitigations: LAN-only use, login always on, HTTPS on by default.
+#
+# Each entry expires 2027-01-31, after which the build fails again until
+# someone re-checks for a Forge Neo release that moves past gradio 4.x.
+# Source: https://osv.dev (package gradio, version 4.44.1).
+# ------------------------------------------------------------------------------
+# gradio Critical, fixed in: 5.6.0. Gradio Blocked Path ACL Bypass Vulnerability
+CVE-2025-23042 exp:2027-01-31
+# gradio High, fixed in: none. Gradio Vulnerable to Denial of Service (DoS) via Crafted Zip Bomb
+CVE-2024-10569 exp:2027-01-31
+# gradio High, fixed in: none. Gradio Vulnerable to Denial of Service (DoS) via Crafted HTTP Request
+CVE-2024-10624 exp:2027-01-31
+# gradio High, fixed in: none. Gradio Vulnerable to Arbitrary File Deletion
+CVE-2024-10648 exp:2027-01-31
+# gradio High, fixed in: 5.0.0. Gradio lacks integrity checking on the downloaded FRP client
+CVE-2024-47867 exp:2027-01-31
+# gradio High, fixed in: 5.0.0. Gradio has a race condition in update_root_in_config may redirect user traffic
+CVE-2024-47870 exp:2027-01-31
+# gradio High, fixed in: 5.0.0. Gradio uses insecure communication between the FRP client and server
+CVE-2024-47871 exp:2027-01-31
+# gradio High, fixed in: none. Gradio DOS in multipart boundry while uploading the file
+CVE-2024-8966 exp:2027-01-31
+# gradio High, fixed in: 6.7.0. Gradio is Vulnerable to Absolute Path Traversal on Windows with Python 3.13+
+CVE-2026-28414 exp:2027-01-31
+# gradio High, fixed in: 6.6.0. Gradio has SSRF via Malicious `proxy_url` Injection in `gr.load()` Config Processing
+CVE-2026-28416 exp:2027-01-31
+# gradio High, fixed in: 6.15.0. Gradio contains a cookie injection vulnerability
+CVE-2026-48545 exp:2027-01-31
+# gradio High, fixed in: 6.16.0. Gradio FileExplorer preprocess path traversal allows files outside root_dir to reach callbacks
+CVE-2026-49119 exp:2027-01-31
+# gradio Moderate, fixed in: none. Gradio Path Traversal vulnerability
+CVE-2024-12217 exp:2027-01-31
+# gradio Moderate, fixed in: 5.0.0. Gradio's `is_in_or_equal` function may be bypassed
+CVE-2024-47164 exp:2027-01-31
+# gradio Moderate, fixed in: 5.0.0. Gradio's CORS origin validation accepts the null origin
+CVE-2024-47165 exp:2027-01-31
+# gradio Moderate, fixed in: 5.0.0. Gradio vulnerable to SSRF in the path parameter of /queue/join
+CVE-2024-47167 exp:2027-01-31
+# gradio Moderate, fixed in: 5.0.0. Gradio has several components with post-process steps allow arbitrary file leaks
+CVE-2024-47868 exp:2027-01-31
+# gradio Moderate, fixed in: 5.0.0. Gradio has an XSS on every Gradio server via upload of HTML files, JS files, or SVG files
+CVE-2024-47872 exp:2027-01-31
+# gradio Moderate, fixed in: 5.31.0. Gradio Allows Unauthorized File Copy via Path Manipulation
+CVE-2025-48889 exp:2027-01-31
+# gradio Moderate, fixed in: 6.6.0. Gradio has an Open Redirect in its OAuth Flow
+CVE-2026-28415 exp:2027-01-31
+# gradio Low, fixed in: 6.15.1. Gradio: Audio cache key ignores metadata when saving numpy audio outputs
+CVE-2026-10783 exp:2027-01-31
+# gradio Low, fixed in: 6.6.0. Gradio: Mocked OAuth Login Exposes Server Credentials and Uses Hardcoded Session Secret
+CVE-2026-27167 exp:2027-01-31
+# gradio Low, fixed in: 5.0.0. Gradio's dropdown component pre-process step does not limit the values to those in the dropdown list
+GHSA-26jh-r8g2-6fpr exp:2027-01-31

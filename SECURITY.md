@@ -112,6 +112,14 @@ grep -n 'umask 077' start.sh
 - [ ] PASS if the Forge Neo source is pinned to a release tag's commit SHA (`WEBUI_REF` in the Dockerfile), and the build checks that the fetched commit matches.
 - [ ] PASS if images are only published under `:dev`, `:latest` or `:vX.Y.Z` after the Trivy image scan in `.github/workflows/build-image.yml` passes (the scan step must use `exit-code: "1"`).
 - [ ] PASS if image builds authenticate with the workflow's `GITHUB_TOKEN`, not a personal access token.
+- [ ] PASS if every `.trivyignore` vulnerability entry has a reason comment and an `exp:` date, and is listed in the README "Known security issues" section.
+
+### HTTPS
+
+- [ ] PASS if `WEBUI_TLS` defaults to `auto` (HTTPS on) in both the Dockerfile/start.sh and `template.xml`.
+- [ ] PASS if the self-signed private key is created under `umask 077` and `/config/tls` is mode 700.
+- [ ] PASS if `WEBUI_TLS_HOSTNAMES` entries are validated against a strict hostname/IPv4 pattern before reaching `openssl`.
+- [ ] PASS if `start.sh` never adds `--disable-tls-verify` (verification uses the `SSL_CERT_FILE` trust bundle instead).
 
 Verification commands:
 
@@ -183,6 +191,10 @@ The `/data` volume cannot use `noexec` because extensions live in `/data/extensi
 The image pins Python packages to the versions Forge Neo installs. Neo's built-in ControlNet preprocessor installer also installs a few packages without a version (for example `insightface`). Those are installed at build time, so they are fixed per image and covered by the Trivy scan, but two builds of the same release may get different versions.
 
 ## Known upstream issues (Forge Neo)
+
+The full, user-facing list, including every Gradio CVE, is in the README section [Known security issues](README.md#known-security-issues). Keep the two in sync.
+
+**Gradio 4 (biggest risk).** Forge Neo 2.31 pins Gradio 4.40.0, which has 28 published vulnerabilities (1 critical). Most are fixed only in Gradio 5/6, which Neo does not support. This image upgrades to Gradio 4.44.1, fixing 5 of them; this is untested upstream and may break parts of the UI (`GRADIO_VERSION` build argument to roll back). The remaining 23 are accepted in `.trivyignore`, each with a reason and a 2027-01-31 expiry that forces a re-review.
 
 These were found during the 2026-10-28 review of Forge Neo 2.31 and are not fixed by this container:
 

@@ -521,6 +521,135 @@ else
   fi
 fi
 
+# ── HTTPS / TLS ──────────────────────────────────────────────────────────────
+# WEBUI_TLS=auto (default): serve HTTPS. Uses /config/tls/custom.crt and
+#   custom.key if both exist, otherwise a self-signed certificate that this
+#   script creates and renews in /config/tls/.
+# WEBUI_TLS=off: plain HTTP.
+# Passing your own --tls-keyfile/--tls-certfile in COMMANDLINE_ARGS skips all
+# of this, the same way your own auth flags skip the managed auth file.
+#
+# Verification stays on. Instead of --disable-tls-verify, the certificate is
+# added to a trust bundle (SSL_CERT_FILE), so Gradio's startup request to its
+# own HTTPS address is still checked.
+TLS_ARGS=()
+TLS_SCHEME="http"
+TLS_DIR="/config/tls"
+WEBUI_TLS="${WEBUI_TLS:-auto}"
+TLS_RENEW_SECONDS=$(( 30 * 24 * 3600 ))   # renew self-signed certs 30 days before expiry
+
+# _tls_fingerprint <cert>: SHA-256 fingerprint, for checking against the browser.
+_tls_fingerprint() {
+  openssl x509 -noout -fingerprint -sha256 -in "$1" 2>/dev/null | cut -d= -f2
+}
+
+# _tls_san_list: subjectAltName value for the self-signed certificate.
+# Each WEBUI_TLS_HOSTNAMES entry is validated strictly because it is passed
+# to openssl; anything that is not a plain IPv4 address or hostname stops startup.
+_tls_san_list() {
+  local -a sans=("DNS:localhost" "IP:127.0.0.1")
+  local name
+  name="$(hostname 2>/dev/null || true)"
+  [[ "${name}" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ ]] && sans+=("DNS:${name}")
+  local -a extra=()
+  IFS=',' read -r -a extra <<< "${WEBUI_TLS_HOSTNAMES:-}"
+  [[ -n "${WEBUI_HOST_IP:-}" ]] && extra+=("${WEBUI_HOST_IP}")
+  for name in "${extra[@]}"; do
+    name="${name//[[:space:]]/}"
+    [[ -z "${name}" ]] && continue
+    if [[ "${name}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+      sans+=("IP:${name}")
+    elif [[ "${name}" =~ ^(\*\.)?[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*$ ]]; then
+      sans+=("DNS:${name}")
+    else
+      echo "${C_CRIT}${C_BOLD}ERROR:${C_RESET}${C_CRIT} WEBUI_TLS_HOSTNAMES has an invalid entry: ${name}${C_RESET}" >&2
+      echo "${C_WARN}       Use comma-separated hostnames or IPv4 addresses, for example: aether.local,10.0.0.5${C_RESET}" >&2
+      exit 1
+    fi
+  done
+  local IFS=','
+  echo "${sans[*]}"
+}
+
+if [[ -n "${COMMANDLINE_ARGS:-}" && " ${COMMANDLINE_ARGS} " =~ [[:space:]]--tls-(keyfile|certfile)([=[:space:]]|$) ]]; then
+  TLS_SCHEME="https"
+  echo "${C_INFO}HTTPS is being managed via COMMANDLINE_ARGS (--tls-keyfile / --tls-certfile).${C_RESET}" >&2
+elif [[ "${WEBUI_TLS,,}" == "off" ]]; then
+  echo "${C_WARN}HTTPS is off (WEBUI_TLS=off). Logins and images cross the network unencrypted.${C_RESET}" >&2
+elif [[ "${WEBUI_TLS,,}" != "auto" ]]; then
+  echo "${C_CRIT}${C_BOLD}ERROR:${C_RESET}${C_CRIT} Unrecognized WEBUI_TLS=${WEBUI_TLS}. Expected auto or off.${C_RESET}" >&2
+  exit 1
+else
+  if ! command -v openssl >/dev/null 2>&1; then
+    echo "${C_CRIT}${C_BOLD}ERROR:${C_RESET}${C_CRIT} openssl is missing from the image, so HTTPS cannot be set up. Set WEBUI_TLS=off to start without it.${C_RESET}" >&2
+    exit 1
+  fi
+  ( umask 077; mkdir -p "${TLS_DIR}" )
+  chmod 700 "${TLS_DIR}" 2>/dev/null || true
+
+  if [[ -f "${TLS_DIR}/custom.crt" && -f "${TLS_DIR}/custom.key" ]]; then
+    tls_cert="${TLS_DIR}/custom.crt"
+    tls_key="${TLS_DIR}/custom.key"
+    chmod 600 "${tls_key}" 2>/dev/null || true
+    # The key must belong to the certificate; compare their public keys.
+    cert_pub="$(openssl x509 -noout -pubkey -in "${tls_cert}" 2>/dev/null | openssl sha256 2>/dev/null || true)"
+    key_pub="$(openssl pkey -pubout -in "${tls_key}" 2>/dev/null | openssl sha256 2>/dev/null || true)"
+    if [[ -z "${cert_pub}" || "${cert_pub}" != "${key_pub}" ]]; then
+      echo "${C_CRIT}${C_BOLD}ERROR:${C_RESET}${C_CRIT} ${TLS_DIR}/custom.crt and custom.key are unreadable or do not belong together.${C_RESET}" >&2
+      echo "${C_WARN}       Fix or remove both files (the container then uses a self-signed certificate), or set WEBUI_TLS=off.${C_RESET}" >&2
+      exit 1
+    fi
+    if ! openssl x509 -noout -checkend 0 -in "${tls_cert}" >/dev/null 2>&1; then
+      echo "${C_CRIT}[WARNING] ${TLS_DIR}/custom.crt has EXPIRED. Browsers will refuse it. Replace it.${C_RESET}" >&2
+    elif ! openssl x509 -noout -checkend "${TLS_RENEW_SECONDS}" -in "${tls_cert}" >/dev/null 2>&1; then
+      echo "${C_WARN}[WARNING] ${TLS_DIR}/custom.crt expires within 30 days. Replace it soon.${C_RESET}" >&2
+    fi
+    echo "${C_INFO}HTTPS enabled with your certificate (${TLS_DIR}/custom.crt).${C_RESET}" >&2
+  else
+    tls_cert="${TLS_DIR}/selfsigned.crt"
+    tls_key="${TLS_DIR}/selfsigned.key"
+    tls_san="$(_tls_san_list)"
+    # (Re)create when missing, expiring within 30 days, or covering different names.
+    if [[ ! -f "${tls_cert}" || ! -f "${tls_key}" ]] \
+      || ! openssl x509 -noout -checkend "${TLS_RENEW_SECONDS}" -in "${tls_cert}" >/dev/null 2>&1 \
+      || [[ "$(cat "${TLS_DIR}/selfsigned.san" 2>/dev/null)" != "${tls_san}" ]]; then
+      echo "${C_INFO}Creating a self-signed HTTPS certificate for: ${tls_san}${C_RESET}" >&2
+      # ECDSA P-256, valid 825 days (the longest Apple platforms accept).
+      # umask 077: the private key is never readable by anyone else, not even briefly.
+      if ! ( umask 077; openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
+          -keyout "${tls_key}.new" -out "${tls_cert}.new" -days 825 \
+          -subj "/CN=SD-WebUI-Forge-Neo-Unraid" \
+          -addext "subjectAltName=${tls_san}" \
+          -addext "basicConstraints=critical,CA:FALSE" \
+          -addext "keyUsage=critical,digitalSignature" \
+          -addext "extendedKeyUsage=serverAuth" ) >/dev/null 2>&1; then
+        echo "${C_CRIT}${C_BOLD}ERROR:${C_RESET}${C_CRIT} Could not create the HTTPS certificate in ${TLS_DIR}. Set WEBUI_TLS=off to start without HTTPS.${C_RESET}" >&2
+        rm -f "${tls_key}.new" "${tls_cert}.new"
+        exit 1
+      fi
+      mv -f "${tls_key}.new" "${tls_key}"
+      mv -f "${tls_cert}.new" "${tls_cert}"
+      printf '%s' "${tls_san}" > "${TLS_DIR}/selfsigned.san"
+    fi
+    echo "${C_INFO}HTTPS enabled with a self-signed certificate. Your browser will warn once; compare this fingerprint before accepting:${C_RESET}" >&2
+  fi
+  echo "${C_ACCENT}  SHA-256 fingerprint: $(_tls_fingerprint "${tls_cert}")${C_RESET}" >&2
+
+  # Trust bundle: the normal public CAs plus this certificate, so verification
+  # can stay on. SSL_CERT_FILE replaces the default list, hence the public CAs.
+  tls_bundle="${RUNTIME_WEBUI_TMP_DIR}/tls-trust-bundle.pem"
+  certifi_bundle="$("${PYTHON_BIN}" -c 'import certifi; print(certifi.where())' 2>/dev/null || true)"
+  if [[ -n "${certifi_bundle}" && -f "${certifi_bundle}" ]]; then
+    cat "${certifi_bundle}" "${tls_cert}" > "${tls_bundle}"
+    export SSL_CERT_FILE="${tls_bundle}"
+  else
+    echo "${C_WARN}[WARNING] Could not find the public CA bundle (certifi); the WebUI's startup self-check may fail.${C_RESET}" >&2
+  fi
+
+  TLS_ARGS+=("--tls-keyfile" "${tls_key}" "--tls-certfile" "${tls_cert}")
+  TLS_SCHEME="https"
+fi
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Startup output helpers
 # ─────────────────────────────────────────────────────────────────────────────
@@ -708,9 +837,9 @@ _poll_for_ready() {
     if (: < /dev/tcp/127.0.0.1/"${_port}") 2>/dev/null; then
       local _url
       if [[ -n "${_host_ip}" ]]; then
-        _url="http://${_host_ip}:${_port}/"
+        _url="${TLS_SCHEME}://${_host_ip}:${_port}/"
       else
-        _url="http://<your-unraid-ip>:${_port}/"
+        _url="${TLS_SCHEME}://<your-unraid-ip>:${_port}/"
       fi
       echo ""
       echo "  ${C_ACCENT}${C_BOLD}╭─ [READY] ───────────────────────────────────────────────────────────╮"
@@ -734,16 +863,16 @@ is_truthy() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Build final COMMANDLINE_ARGS with auth flags appended, then launch.
+# Build final COMMANDLINE_ARGS with auth and TLS flags appended, then launch.
 #
 # Note: --api-auth credentials are appended here as a plain string because
 # The WebUI has no file-based equivalent for API auth. This means credentials
 # are visible via docker inspect / /proc/<pid>/environ. See README for
 # the full discussion and mitigation options.
 # ─────────────────────────────────────────────────────────────────────────────
-if [[ ${#AUTH_ARGS[@]} -gt 0 ]]; then
+if [[ $(( ${#AUTH_ARGS[@]} + ${#TLS_ARGS[@]} )) -gt 0 ]]; then
   quoted_auth_args=()
-  for arg in "${AUTH_ARGS[@]}"; do
+  for arg in "${AUTH_ARGS[@]}" "${TLS_ARGS[@]}"; do
     quoted_auth_args+=("$(python3 -c "import shlex,sys; print(shlex.quote(sys.argv[1]))" "${arg}")")
   done
   export COMMANDLINE_ARGS="${COMMANDLINE_ARGS:-} ${quoted_auth_args[*]}"
