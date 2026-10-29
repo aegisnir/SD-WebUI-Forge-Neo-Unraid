@@ -63,7 +63,7 @@ FROM ghcr.io/astral-sh/uv:0.13.6@sha256:af22a52f5eafef3d78e551599d405c02df61919d
 # Base image: NVIDIA CUDA runtime (Ubuntu 22.04), pinned by digest.
 # Update this digest intentionally whenever you choose to refresh the base image.
 # ------------------------------------------------------------------------------
-FROM nvidia/cuda:13.0.2-runtime-ubuntu22.04@sha256:cc28faec68e3dffcf6803683d34a03dcd62fe29e58a0b34b710b800a3d7b73b3
+FROM nvidia/cuda:13.4.3-runtime-ubuntu22.04@sha256:c0387ce9e00bfc8fc341553a3a3ca131162eabf2159ef1f59b5729b900e6533e
 
 # Use bash with -euo pipefail for safer RUN pipelines (matches set -euo in scripts).
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
