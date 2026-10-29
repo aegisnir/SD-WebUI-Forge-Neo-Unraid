@@ -15,7 +15,7 @@
 
 Forge Neo is Haoming02's work, a maintained fork of the Stable Diffusion WebUI. This repository does not change the WebUI. It only packages it as a hardened Unraid container with NVIDIA GPU support in mind. Bugs in the WebUI itself belong [upstream](https://github.com/Haoming02/sd-webui-forge-classic/issues). The goal is to keep it practical, easy to use, and security-conscious.
 
-Other Stable Diffusion WebUI containers for Unraid exist, but I wasn't happy with any of them -- limited file access, ignored support requests, or just general instability. I ended up using a generic Docker image I found online, but since it wasn't built for Unraid, I ran into issues with automatic updates and other quirks. So I decided to build my own. I'm making this repo public in the hopes that it will be useful to others.
+I couldn't find a Forge Neo container built for Unraid, so I made one. I had been running Forge Neo from a generic Docker image I found online, but since it wasn't built for Unraid, I ran into issues with automatic updates and other quirks. I'm making this repo public in the hopes that it will be useful to others.
 
 > [!NOTE]
 > This project started as an AUTOMATIC1111 container. AUTOMATIC1111 stopped receiving updates in March 2026 and has unpatched security issues, so it was rebased on Forge Neo. If you are coming from the old A1111 image, see [Migration Notes](#migration-notes).
