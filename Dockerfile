@@ -312,10 +312,15 @@ RUN rm -f /usr/local/bin/uv
 # volumes, so the WebUI works with a read-only container filesystem:
 #   tmp/           restart marker, Gradio theme cache, config.json backups
 #   config_states/ extension state snapshots
+#   the built-in Spectrum extension's presets.json, which it creates on first
+#   load and rewrites when a preset is saved (created on first load if missing;
+#   the build fails if upstream starts shipping that file, so it gets reviewed)
 # The target directories are created by start.sh on each launch.
 RUN rm -rf "${WEBUI_DIR}/tmp" "${WEBUI_DIR}/config_states" \
   && ln -s /data/tmp/webui "${WEBUI_DIR}/tmp" \
   && ln -s /config/webui/config_states "${WEBUI_DIR}/config_states" \
+  && test ! -e "${WEBUI_DIR}/extensions-builtin/sd_forge_spectrum/presets.json" \
+  && ln -s /config/webui/spectrum-presets.json "${WEBUI_DIR}/extensions-builtin/sd_forge_spectrum/presets.json" \
   && chown -R sdwebui:sdwebui "${WEBUI_DIR}"
 
 # Create the /config directory that holds auth files and state.

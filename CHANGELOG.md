@@ -14,6 +14,7 @@ I am keeping this intentionally lightweight. This is a personal, AI-assisted hob
 
 ### Fixed (UI half-loaded on first Aether test, 2026-10-29)
 
+- **Built-in Spectrum extension failed to load:** it creates `presets.json` in its own folder on first load (read-only here). That file is now a link to `/config/webui/spectrum-presets.json`, so presets are saved in appdata.
 - **403 on all of Neo's scripts and styles:** Neo only lets Gradio serve files from its data folder, which by default is its program folder. This image moves data to `/data`, so the program files fell off the list. `start.sh` now adds `--gradio-allowed-path` for exactly what the browser loads: `script.js`, `style.css`, `javascript/`, `html/` and `extensions-builtin/` (narrower than upstream, which allows its whole folder).
 - **Gradio 4.44.1 served CSS as a download:** build-time patch adds `text/css` and JavaScript (`text/javascript`, `application/javascript`) to Gradio's safe inline types. HTML and SVG stay blocked. The build fails if the patch stops applying.
 

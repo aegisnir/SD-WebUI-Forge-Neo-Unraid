@@ -363,6 +363,7 @@ The container uses two main mount points. Here is where everything lives:
 │   ├── config.json               UI settings
 │   ├── ui-config.json            UI layout/defaults
 │   ├── styles.csv                Prompt styles
+│   ├── spectrum-presets.json     Presets of the built-in Spectrum extension
 │   └── config_states/            Extension state snapshots
 ├── auth/
 │   └── webui-auth.txt            Login credentials (chmod 600)
