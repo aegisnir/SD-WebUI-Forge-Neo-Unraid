@@ -730,6 +730,9 @@ If you delete the host data directory (`<data-path>`), Docker may recreate it ow
 [entrypoint] Repaired 42 files under /data. Continuing startup.
 ```
 
+> [!WARNING]
+> **Known issue:** the auto-fix re-owns **everything** under `/data`, including any other share you map inside it (for example a separate models share mapped to `/data/models`). If another app also uses that share and runs as a different user, it may lose write access. Until this is fixed, don't map shares that other containers use inside `/data`, or set `APP_UID`/`APP_GID` to the owner those files already have.
+
 **If the auto-fix fails** (NFS shares with root squash, unusual SELinux policies, or other host-side restrictions), correct ownership manually on the Unraid host and restart:
 
 ```bash
@@ -837,7 +840,7 @@ The included `template.xml` defaults to the published GHCR image:
 
 - Repository: `ghcr.io/aegisnir/sd-webui-forge-neo-unraid:dev`
 
-Images are built by GitHub Actions. Every build is pushed as `:sha-<commit>`, scanned with Trivy, and only then published under its channel tag (`:dev`, `:latest`, or `:vX.Y.Z`). The `:sha-` tags stay available as rollback points.
+Images are built by GitHub Actions. Every build is pushed as `:sha-<commit>`, scanned with Trivy, and only then published under its channel tag (`:dev`, `:latest`, or `:vX.Y.Z`). The `:sha-` tags stay available as rollback points. A `:sha-` tag can be pulled before its scan finishes, and a build that fails the scan keeps its `:sha-` tag, so use the channel tags unless you are rolling back to a build you know passed.
 
 For local builds, change the repository to `sd-webui-forge-neo-unraid:local`. When a stable release is promoted, switch to `ghcr.io/aegisnir/sd-webui-forge-neo-unraid:latest`.
 

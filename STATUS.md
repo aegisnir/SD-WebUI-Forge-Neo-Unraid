@@ -4,6 +4,8 @@
 
 ## Completed
 
+> Items up to "Release posture decided" describe the old AUTOMATIC1111 image (venv, xformers, `build-push.sh`). They are kept as history; the Forge Neo image no longer uses them.
+
 - Container/runtime hardening implemented and documented:
   - read-only root filesystem
   - tmpfs for `/tmp`
@@ -87,22 +89,22 @@
 
 ## In Progress
 
-- Rebase from AUTOMATIC1111 onto Forge Neo 2.31 (branch `forge-neo`). Code and docs written,
-  static checks pass. Not yet built or run.
+- Forge Neo rebase: first image built, passed the Trivy gate, and published as `:dev` (2026-10-29).
+  Next: the Aether test (checklist in the maintainer's vault note).
 
 ## Remaining
 
-- Rename the GitHub repository to `sd-webui-forge-neo-unraid` (Settings → General).
-- Enable "Allow GitHub Actions to create and approve pull requests" (for the Neo update check).
-- Merge `forge-neo` into `dev`, let `build-image.yml` build the first image, then set the
-  `sd-webui-forge-neo-unraid` GHCR package to public.
-- Test on Aether as a second container on another port with a copy of the data: login,
-  one image, Restart button, one extension, clean logs, speed vs the current xformers setup.
-- Re-check Gradio 4.40 for login rate limiting (SECURITY.md M-7).
+- Test on Aether as a second container on port 7861 with a separate test data folder and one
+  copied checkpoint: login, one image, Restart button, one extension, clean logs, login lockout,
+  speed vs the old xformers setup.
+- Fix the `/data` ownership repair so it no longer re-owns shares mapped inside `/data`
+  (warn instead). Documented as a known issue in the README.
 - After the first build works: switch the base image to plain `ubuntu:24.04` (digest-pinned).
   Ubuntu 22.04 standard support ends April 2027, and the `nvidia/cuda` base duplicates the CUDA
   libraries the torch wheels already install. Set `NVIDIA_VISIBLE_DEVICES` and
   `NVIDIA_DRIVER_CAPABILITIES` in the Dockerfile (the CUDA image set them), then re-test on Aether.
+- Decide on optional TOTP 2FA and the two Forge Neo build-time patches (XSS escape, safetensors
+  header size cap).
 - Re-run fresh install, persistence, and read-only smoke tests before promoting `:latest`.
 - CA App Store submission (deferred until `:latest` is ready).
 
@@ -135,5 +137,5 @@
 
 ## Notes
 
-- Last A1111 image: `:v1.0.3` (old package name). New image: `ghcr.io/aegisnir/sd-webui-forge-neo-unraid` (not built yet).
+- Last A1111 image: `:v1.0.3` (old package name). New image: `ghcr.io/aegisnir/sd-webui-forge-neo-unraid`, `:dev` published 2026-10-29.
 - For production-style deployments, use `WEBUI_AUTH_FILE` when possible and treat logs as sensitive.
