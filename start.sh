@@ -863,16 +863,29 @@ is_truthy() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Build final COMMANDLINE_ARGS with auth and TLS flags appended, then launch.
+# Files the browser loads from Neo's program folder
+#
+# Neo lets Gradio serve only its data folder (plus the canvas folder). Upstream
+# the data folder is the program folder, so its scripts and styles are covered.
+# Here data is /data, so allow exactly what the UI loads from the program
+# folder. Narrower than upstream, which allows the whole folder.
+# ─────────────────────────────────────────────────────────────────────────────
+ALLOWED_PATH_ARGS=()
+for _web_path in script.js style.css javascript html extensions-builtin; do
+  ALLOWED_PATH_ARGS+=("--gradio-allowed-path" "${WEBUI_DIR}/${_web_path}")
+done
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Build final COMMANDLINE_ARGS with auth, TLS and allowed-path flags appended, then launch.
 #
 # Note: --api-auth credentials are appended here as a plain string because
 # The WebUI has no file-based equivalent for API auth. This means credentials
 # are visible via docker inspect / /proc/<pid>/environ. See README for
 # the full discussion and mitigation options.
 # ─────────────────────────────────────────────────────────────────────────────
-if [[ $(( ${#AUTH_ARGS[@]} + ${#TLS_ARGS[@]} )) -gt 0 ]]; then
+if [[ $(( ${#AUTH_ARGS[@]} + ${#TLS_ARGS[@]} + ${#ALLOWED_PATH_ARGS[@]} )) -gt 0 ]]; then
   quoted_auth_args=()
-  for arg in "${AUTH_ARGS[@]}" "${TLS_ARGS[@]}"; do
+  for arg in "${AUTH_ARGS[@]}" "${TLS_ARGS[@]}" "${ALLOWED_PATH_ARGS[@]}"; do
     quoted_auth_args+=("$(python3 -c "import shlex,sys; print(shlex.quote(sys.argv[1]))" "${arg}")")
   done
   export COMMANDLINE_ARGS="${COMMANDLINE_ARGS:-} ${quoted_auth_args[*]}"

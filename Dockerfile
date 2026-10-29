@@ -258,6 +258,11 @@ RUN git init -q "${WEBUI_DIR}" \
 # Neo also unpacks bundled tokenizer files into its own folder on first
 # start (backend/huggingface process()). The program folder is read-only
 # at runtime, so that runs here too; it checks each file's SHA-256 itself.
+# Gradio patch (maintainer's own, see README "Known security issues"):
+# 4.44.1 serves every type outside XSS_SAFE_MIMETYPES as a download, which
+# includes Neo's CSS and JavaScript, so the UI loads half-built. Add exactly
+# those types. HTML and SVG, which can run scripts when opened, stay as
+# downloads. Skipped when the list doesn't exist (GRADIO_VERSION=4.40.0).
 # --skip-torch-cuda-test: the build host has no GPU.
 # The last step fails the build if anything replaced the pinned torch.
 # compileall: "|| true" because a few bundled third-party files may not
@@ -269,6 +274,12 @@ RUN python3 -m pip install --no-cache-dir --prefer-binary \
   && python3 -m pip install --no-cache-dir --prefer-binary -r requirements.txt \
   && python3 -m pip install --no-cache-dir --prefer-binary \
   "GitPython==${GITPYTHON_VERSION}" "diffusers==${DIFFUSERS_VERSION}" "setuptools==${SETUPTOOLS_VERSION}" \
+  && python3 -c "import importlib.util, pathlib, py_compile; \
+p = pathlib.Path(importlib.util.find_spec('gradio.routes').origin); s = p.read_text(); \
+o = '    \"application/json\",\n}'; \
+n = '    \"application/json\",\n    \"text/css\",\n    \"text/javascript\",\n    \"application/javascript\",\n}'; \
+assert 'XSS_SAFE_MIMETYPES' not in s or s.count(o) == 1, 'gradio patch: anchor not found'; \
+'XSS_SAFE_MIMETYPES' in s and (p.write_text(s.replace(o, n)), py_compile.compile(str(p), doraise=True))" \
   && mkdir -p /tmp/neo-build/extensions \
   && COMMANDLINE_ARGS="" python3 launch.py --skip-torch-cuda-test --skip-python-version-check \
   --data-dir /tmp/neo-build --exit \
@@ -283,6 +294,8 @@ assert m.version('diffusers') == os.environ['DIFFUSERS_VERSION'], m.version('dif
 assert m.version('setuptools') == os.environ['SETUPTOOLS_VERSION'], m.version('setuptools'); \
 assert tuple(int(x) for x in m.version('urllib3').split('.')[:2]) >= (2, 8), 'urllib3 ' + m.version('urllib3'); \
 import pkg_resources; \
+import mimetypes, gradio.routes as gr_routes; X = getattr(gr_routes, 'XSS_SAFE_MIMETYPES', None); \
+assert X is None or (mimetypes.guess_type('a.js')[0] in X and mimetypes.guess_type('a.css')[0] in X and not {'text/html', 'image/svg+xml'} & X), X; \
 m.version('onnxruntime'); m.version('depth_anything'); m.version('depth_anything_v2'); \
 from backend.huggingface import Token; \
 missing = [p for p in vars(Token).values() if isinstance(p, str) and p.endswith('tokenizer.json') and not os.path.isfile(p)]; \

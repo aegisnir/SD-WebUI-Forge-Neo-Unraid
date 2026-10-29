@@ -130,6 +130,11 @@ grep -n 'umask 077' start.sh
 - [ ] PASS if `WEBUI_TLS_HOSTNAMES` entries are validated against a strict hostname/IPv4 pattern before reaching `openssl`.
 - [ ] PASS if `start.sh` never adds `--disable-tls-verify` (verification uses the `SSL_CERT_FILE` trust bundle instead).
 
+### Gradio file serving
+
+- [ ] PASS if the Gradio patch in the Dockerfile adds only `text/css`, `text/javascript` and `application/javascript` to `XSS_SAFE_MIMETYPES` (never `text/html` or `image/svg+xml`), and the build asserts it applied.
+- [ ] PASS if `start.sh` allows only `script.js`, `style.css`, `javascript/`, `html/` and `extensions-builtin/` under the program folder (never the whole folder).
+
 Verification commands:
 
 ```bash
@@ -205,7 +210,7 @@ The full, user-facing list, including every Gradio CVE, is in the README section
 
 **Other Python packages.** The first image scan found 21 HIGH findings outside Gradio. GitPython, diffusers and setuptools are upgraded in the image (10 fixed; versions asserted in the Dockerfile). The other 11 are accepted in `.trivyignore` with reasons; see the README.
 
-**Gradio 4 (biggest risk).** Forge Neo 2.31 pins Gradio 4.40.0, which has 28 published vulnerabilities (1 critical). Most are fixed only in Gradio 5/6, which Neo does not support. This image upgrades to Gradio 4.44.1, fixing 5 of them; this is untested upstream and may break parts of the UI (`GRADIO_VERSION` build argument to roll back). The remaining 23 are accepted in `.trivyignore`, each with a reason and a 2027-01-31 expiry that forces a re-review.
+**Gradio 4 (biggest risk).** Forge Neo 2.31 pins Gradio 4.40.0, which has 28 published vulnerabilities (1 critical). Most are fixed only in Gradio 5/6, which Neo does not support. This image upgrades to Gradio 4.44.1, fixing 5 of them; this is untested upstream and may break parts of the UI (`GRADIO_VERSION` build argument to roll back). 4.44.1 serves non-allowlisted file types as downloads, which broke Neo's CSS; the build patches Gradio's `XSS_SAFE_MIMETYPES` to add `text/css` and JavaScript (`text/javascript`, `application/javascript`) only (HTML/SVG stay as downloads), and fails if the patch no longer applies. The remaining 23 are accepted in `.trivyignore`, each with a reason and a 2027-01-31 expiry that forces a re-review.
 
 These were found during the 2026-10-28 review of Forge Neo 2.31 and are not fixed by this container:
 
