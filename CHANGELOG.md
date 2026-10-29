@@ -7,6 +7,11 @@ I am keeping this intentionally lightweight. This is a personal, AI-assisted hob
 
 ## [Unreleased]
 
+### Fixed (first Aether test, 2026-10-29)
+
+- **Crash loop on first start:** Forge Neo unpacks its bundled tokenizer files into its own program folder on first start, which is read-only in this image (`OSError: [Errno 30] Read-only file system`). The build now unpacks them, and checks their SHA-256 using Neo's own code.
+- **Built-in preprocessor packages installed at startup instead of build time:** Neo skips all extension installers when `<data-dir>/extensions` doesn't exist, so the build never installed the ControlNet preprocessor packages and they were downloaded into `/data/python-user` on first start. The build now creates that folder, so they are baked in and covered by the image scan.
+
 ### Added (template)
 
 - `APP_UID` / `APP_GID` settings in the Unraid template (advanced view), defaulting to `99` / `100`. The entrypoint now rejects non-numeric values as well as `0`.

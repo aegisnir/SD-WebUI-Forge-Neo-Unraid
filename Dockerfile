@@ -252,7 +252,12 @@ RUN git init -q "${WEBUI_DIR}" \
 # A single combined install would refuse to resolve. pip (not uv) is used here
 # because it installs the way Neo's launcher does.
 # Then run Neo's environment preparation once with --exit so built-in
-# extension installers run now instead of at first start.
+# extension installers run now instead of at first start. Neo skips ALL
+# extension installers (built-in ones too) when <data-dir>/extensions is
+# missing, so that folder is created first.
+# Neo also unpacks bundled tokenizer files into its own folder on first
+# start (backend/huggingface process()). The program folder is read-only
+# at runtime, so that runs here too; it checks each file's SHA-256 itself.
 # --skip-torch-cuda-test: the build host has no GPU.
 # The last step fails the build if anything replaced the pinned torch.
 # compileall: "|| true" because a few bundled third-party files may not
@@ -264,9 +269,10 @@ RUN python3 -m pip install --no-cache-dir --prefer-binary \
   && python3 -m pip install --no-cache-dir --prefer-binary -r requirements.txt \
   && python3 -m pip install --no-cache-dir --prefer-binary \
   "GitPython==${GITPYTHON_VERSION}" "diffusers==${DIFFUSERS_VERSION}" "setuptools==${SETUPTOOLS_VERSION}" \
-  && mkdir -p /tmp/neo-build \
+  && mkdir -p /tmp/neo-build/extensions \
   && COMMANDLINE_ARGS="" python3 launch.py --skip-torch-cuda-test --skip-python-version-check \
   --data-dir /tmp/neo-build --exit \
+  && python3 -c "from backend.huggingface import process; process()" \
   && rm -rf /tmp/neo-build "${WEBUI_DIR}/tmp" /root/.cache \
   && { python3 -m compileall -q "${WEBUI_DIR}" > /dev/null || true; } \
   && GRADIO_VERSION="${GRADIO_VERSION}" GITPYTHON_VERSION="${GITPYTHON_VERSION}" \
@@ -277,6 +283,10 @@ assert m.version('diffusers') == os.environ['DIFFUSERS_VERSION'], m.version('dif
 assert m.version('setuptools') == os.environ['SETUPTOOLS_VERSION'], m.version('setuptools'); \
 assert tuple(int(x) for x in m.version('urllib3').split('.')[:2]) >= (2, 8), 'urllib3 ' + m.version('urllib3'); \
 import pkg_resources; \
+m.version('onnxruntime'); m.version('depth_anything'); m.version('depth_anything_v2'); \
+from backend.huggingface import Token; \
+missing = [p for p in vars(Token).values() if isinstance(p, str) and p.endswith('tokenizer.json') and not os.path.isfile(p)]; \
+assert not missing, missing; \
 assert torch.__version__ == os.environ['TORCH_VERSION'], torch.__version__; \
 assert torchvision.__version__ == os.environ['TORCHVISION_VERSION'], torchvision.__version__; \
 assert gradio.__version__ == os.environ['GRADIO_VERSION'], gradio.__version__; \
