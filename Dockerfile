@@ -12,6 +12,10 @@
 #   - Run as a non-root user where practical
 #   - Pin the CUDA base image and the uv build tool by digest
 #   - Pin upstream Forge Neo to a release tag's commit SHA (WEBUI_REF)
+#   - Build in two stages: Python, PyTorch and Forge Neo are prepared in
+#     'build' and copied into the runtime stage with COPY --link, so an
+#     Ubuntu security update does not change (or re-download) the large
+#     Python layer. See README "How updates are published".
 #
 # This project is maintained as a personal, AI-assisted hobby project.
 # These comments try to explain the reasoning behind the current choices,
@@ -59,11 +63,12 @@
 # uv is only used during the build, to install Python and packages quickly.
 FROM ghcr.io/astral-sh/uv:0.13.6@sha256:af22a52f5eafef3d78e551599d405c02df61919d18028f0cea8eda93bc9986d0 AS uv
 
+
 # ------------------------------------------------------------------------------
 # Base image: NVIDIA CUDA runtime (Ubuntu 22.04), pinned by digest.
 # Update this digest intentionally whenever you choose to refresh the base image.
 # ------------------------------------------------------------------------------
-FROM nvidia/cuda:13.0.2-runtime-ubuntu22.04@sha256:cc28faec68e3dffcf6803683d34a03dcd62fe29e58a0b34b710b800a3d7b73b3
+FROM nvidia/cuda:13.0.2-runtime-ubuntu22.04@sha256:cc28faec68e3dffcf6803683d34a03dcd62fe29e58a0b34b710b800a3d7b73b3 AS build
 
 # Use bash with -euo pipefail for safer RUN pipelines (matches set -euo in scripts).
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
@@ -116,56 +121,14 @@ ARG SETUPTOOLS_VERSION=81.0.0
 ARG PACKAGING_VERSION=26.3
 ARG PIP_VERSION=26.2.2
 
-# Unraid-friendly defaults (nobody/users). Adjust if you use a different strategy.
-ARG APP_UID=99
-ARG APP_GID=100
-
-# Build argument for embedding the image version in OCI labels.
-# Defaults to "dev" for local/untagged builds; CI passes the real version.
-ARG IMAGE_VERSION=dev
-
-# ------------------------------------------------------------------------------
-# OCI image labels — links the GHCR package to this repository, exposes the
-# license, and gives vulnerability scanners (Trivy, Grype, etc.) the source
-# context they need to correlate findings back to the project.
-# Reference: https://github.com/opencontainers/image-spec/blob/main/annotations.md
-# ------------------------------------------------------------------------------
-LABEL org.opencontainers.image.title="SD-WebUI-Forge-Neo-Unraid" \
-  org.opencontainers.image.description="Forge Neo by Haoming02, packaged for Unraid by Aegisnir, with NVIDIA GPU support" \
-  org.opencontainers.image.source="https://github.com/aegisnir/sd-webui-forge-neo-unraid" \
-  org.opencontainers.image.url="https://github.com/aegisnir/sd-webui-forge-neo-unraid" \
-  org.opencontainers.image.licenses="AGPL-3.0-only" \
-  org.opencontainers.image.version="${IMAGE_VERSION}" \
-  sd-webui-forge-neo-unraid.upstream.tag="${WEBUI_TAG}" \
-  sd-webui-forge-neo-unraid.upstream.ref="${WEBUI_REF}"
-
-# ------------------------------------------------------------------------------
-# Runtime defaults
-# NOTE: --listen binds to all interfaces. On a trusted LAN this is often OK,
-# but exposing this service beyond a trusted network may not be as safe as intended.
-# If a user wants stronger exposure controls, those should usually be enforced
-# by network design, reverse proxies, VPNs, access controls, and container
-# runtime settings rather than trying to rely on this image alone.
-#
-# No attention package (xformers, sage, flash) is installed. Neo then uses
-# PyTorch's built-in scaled_dot_product_attention, which Neo's README calls
-# "usually as fast, and also more stable".
-# ------------------------------------------------------------------------------
-# --enable-insecure-extension-access: lets logged-in users install extensions
-# from the WebUI. On by default (owner decision); see README "Extensions".
-ENV COMMANDLINE_ARGS="--listen --port 7860 --data-dir /data --enable-insecure-extension-access"
-# Shown in the startup log banner (start.sh).
-ENV IMAGE_VERSION="${IMAGE_VERSION}"
-ENV WEBUI_TAG="${WEBUI_TAG}"
+# Build-time environment. IMAGE_VERSION is deliberately NOT set here: it
+# changes on every commit and would invalidate every cached layer.
 ENV WEBUI_DIR="/opt/forge-neo"
-ENV PYTHONUSERBASE="/data/python-user"
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 ENV TORCH_VERSION="${TORCH_VERSION}"
 ENV TORCHVISION_VERSION="${TORCHVISION_VERSION}"
-ENV TORCH_INDEX_URL="${TORCH_INDEX_URL}"
-ENV APP_UID="${APP_UID}"
-ENV APP_GID="${APP_GID}"
+
 
 # ------------------------------------------------------------------------------
 # Install minimal runtime dependencies.
@@ -197,14 +160,21 @@ RUN apt-get update \
 # The EXTERNALLY-MANAGED marker is removed so pip can install extension
 # packages into the per-user site at runtime.
 # ------------------------------------------------------------------------------
+# PY_REFRESH: the build workflows pass the current year-month. A new value
+# rebuilds this stage once a month, picking up updates to the Python
+# packages Neo does not pin. Unchanged, every step below is reused from the
+# build cache.
+ARG PY_REFRESH=none
 COPY --from=uv /uv /usr/local/bin/uv
 ENV UV_PYTHON_INSTALL_DIR=/opt/python \
   UV_NO_CACHE=1 \
   UV_COMPILE_BYTECODE=1
-RUN uv python install "${PYTHON_VERSION}" \
+RUN echo "python refresh: ${PY_REFRESH}" \
+  && uv python install "${PYTHON_VERSION}" \
   && py="$(uv python find "${PYTHON_VERSION}")" \
   && ln -sf "${py}" /usr/local/bin/python3 \
   && ln -sf "${py}" /usr/local/bin/python \
+  && readlink -f /usr/local/bin/python3 > /opt/python/.python3-path \
   && find /opt/python -name EXTERNALLY-MANAGED -delete \
   && python3 --version
 
@@ -219,21 +189,6 @@ RUN uv pip install --python /usr/local/bin/python3 --break-system-packages \
   "torch==${TORCH_VERSION}" "torchvision==${TORCHVISION_VERSION}" \
   --index-url "${TORCH_INDEX_URL}"
 
-# ------------------------------------------------------------------------------
-# Create a dedicated non-root runtime user with Unraid-friendly UID/GID defaults.
-# This logic ensures the group and user are always named 'sdwebui', even if the UID/GID already exist with other names (Unraid compatibility).
-# groupmod -n renames existing system groups (e.g. 'users' at GID 100) which may affect other image layers that reference the old name.
-RUN set -eux; \
-  if getent group "${APP_GID}" > /dev/null; then \
-  groupmod -n sdwebui "$(getent group "${APP_GID}" | cut -d: -f1)"; \
-  else \
-  groupadd --gid "${APP_GID}" sdwebui; \
-  fi; \
-  if id -u sdwebui > /dev/null 2>&1; then \
-  usermod -u "${APP_UID}" -g "${APP_GID}" sdwebui; \
-  else \
-  useradd --uid "${APP_UID}" --gid "${APP_GID}" --create-home --shell /bin/bash sdwebui; \
-  fi
 
 # ------------------------------------------------------------------------------
 # Fetch Forge Neo source at the pinned release commit.
@@ -306,8 +261,6 @@ assert gradio.__version__ == os.environ['GRADIO_VERSION'], gradio.__version__; \
 print('torch', torch.__version__, 'torchvision', torchvision.__version__, 'gradio', gradio.__version__)"
 
 # uv is not needed at runtime.
-RUN rm -f /usr/local/bin/uv
-
 # Point the folders Neo writes under its own install directory at writable
 # volumes, so the WebUI works with a read-only container filesystem:
 #   tmp/           restart marker, Gradio theme cache, config.json backups
@@ -320,8 +273,113 @@ RUN rm -rf "${WEBUI_DIR}/tmp" "${WEBUI_DIR}/config_states" \
   && ln -s /data/tmp/webui "${WEBUI_DIR}/tmp" \
   && ln -s /config/webui/config_states "${WEBUI_DIR}/config_states" \
   && test ! -e "${WEBUI_DIR}/extensions-builtin/sd_forge_spectrum/presets.json" \
-  && ln -s /config/webui/spectrum-presets.json "${WEBUI_DIR}/extensions-builtin/sd_forge_spectrum/presets.json" \
-  && chown -R sdwebui:sdwebui "${WEBUI_DIR}"
+  && ln -s /config/webui/spectrum-presets.json "${WEBUI_DIR}/extensions-builtin/sd_forge_spectrum/presets.json"
+
+# ==============================================================================
+# Runtime stage
+# ==============================================================================
+FROM nvidia/cuda:13.0.2-runtime-ubuntu22.04@sha256:cc28faec68e3dffcf6803683d34a03dcd62fe29e58a0b34b710b800a3d7b73b3
+
+# Use bash with -euo pipefail for safer RUN pipelines (matches set -euo in scripts).
+SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG WEBUI_TAG
+ARG WEBUI_REF
+ARG TORCH_VERSION
+ARG TORCHVISION_VERSION
+ARG TORCH_INDEX_URL
+
+# Unraid-friendly defaults (nobody/users). Adjust if you use a different strategy.
+ARG APP_UID=99
+ARG APP_GID=100
+
+# ------------------------------------------------------------------------------
+# Runtime defaults
+# NOTE: --listen binds to all interfaces. On a trusted LAN this is often OK,
+# but exposing this service beyond a trusted network may not be as safe as intended.
+# If a user wants stronger exposure controls, those should usually be enforced
+# by network design, reverse proxies, VPNs, access controls, and container
+# runtime settings rather than trying to rely on this image alone.
+#
+# No attention package (xformers, sage, flash) is installed. Neo then uses
+# PyTorch's built-in scaled_dot_product_attention, which Neo's README calls
+# "usually as fast, and also more stable".
+# ------------------------------------------------------------------------------
+# --enable-insecure-extension-access: lets logged-in users install extensions
+# from the WebUI. On by default (owner decision); see README "Extensions".
+ENV COMMANDLINE_ARGS="--listen --port 7860 --data-dir /data --enable-insecure-extension-access"
+ENV WEBUI_DIR="/opt/forge-neo"
+ENV PYTHONUSERBASE="/data/python-user"
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+ENV TORCH_VERSION="${TORCH_VERSION}"
+ENV TORCHVISION_VERSION="${TORCHVISION_VERSION}"
+ENV TORCH_INDEX_URL="${TORCH_INDEX_URL}"
+ENV APP_UID="${APP_UID}"
+ENV APP_GID="${APP_GID}"
+
+# ------------------------------------------------------------------------------
+# Install minimal runtime dependencies.
+# Docker guidance recommends keeping images small and rebuilding regularly to
+# pick up updates. https://docs.docker.com/build/building/best-practices/
+# ------------------------------------------------------------------------------
+# APT_REFRESH: the build workflows pass today's date (US Eastern), so this
+# layer is rebuilt once a day with current Ubuntu security updates. The
+# Python and Forge Neo layers below are COPY --link layers: they do not
+# depend on this one and are reused unchanged.
+ARG APT_REFRESH=none
+RUN echo "apt refresh: ${APT_REFRESH}" \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends \
+  ca-certificates \
+  openssl \
+  git \
+  # build-essential: Required in final image (not just build stage) because
+  # extensions compile C dependencies at runtime via pip install. Removing the
+  # compiler breaks extension installation. Attack surface is marginal given
+  # extensions already have arbitrary code execution. See SECURITY.md.
+  build-essential \
+  libglib2.0-0 \
+  libgomp1 \
+  libsm6 \
+  libxrender1 \
+  libxext6 \
+  libgl1 \
+  && apt-get upgrade -y \
+  && rm -rf /var/lib/apt/lists/*
+
+# ------------------------------------------------------------------------------
+# Create a dedicated non-root runtime user with Unraid-friendly UID/GID defaults.
+# This logic ensures the group and user are always named 'sdwebui', even if the UID/GID already exist with other names (Unraid compatibility).
+# groupmod -n renames existing system groups (e.g. 'users' at GID 100) which may affect other image layers that reference the old name.
+RUN set -eux; \
+  if getent group "${APP_GID}" > /dev/null; then \
+  groupmod -n sdwebui "$(getent group "${APP_GID}" | cut -d: -f1)"; \
+  else \
+  groupadd --gid "${APP_GID}" sdwebui; \
+  fi; \
+  if id -u sdwebui > /dev/null 2>&1; then \
+  usermod -u "${APP_UID}" -g "${APP_GID}" sdwebui; \
+  else \
+  useradd --uid "${APP_UID}" --gid "${APP_GID}" --create-home --shell /bin/bash sdwebui; \
+  fi
+
+# ------------------------------------------------------------------------------
+# Python (with PyTorch and every WebUI package) and Forge Neo, from the build
+# stage. --link makes each a self-contained layer: it keeps the same digest
+# whatever changes in the layers before it, so Unraid only downloads it again
+# when its own contents change. --chown sets ownership while copying (a
+# separate chown -R would store Neo's whole folder a second time).
+# ------------------------------------------------------------------------------
+COPY --link --from=build /opt/python /opt/python
+COPY --link --chown=${APP_UID}:${APP_GID} --from=build /opt/forge-neo /opt/forge-neo
+# The interpreter path was recorded in the build stage.
+RUN py="$(cat /opt/python/.python3-path)" \
+  && test -x "${py}" \
+  && ln -sf "${py}" /usr/local/bin/python3 \
+  && ln -sf "${py}" /usr/local/bin/python \
+  && python3 --version
 
 # Create the /config directory that holds auth files and state.
 # The actual contents are bind-mounted from the host (appdata on Unraid);
@@ -333,8 +391,7 @@ RUN mkdir -p /config/webui && chown -R sdwebui:sdwebui /config
 # (--gradio-auth, --gradio-auth-path, --api-auth) from startup log output and
 # replaces Neo's interactive "clean reinstall" prompt, which would hang a
 # container that has no keyboard. See WebUI/launch.py.
-COPY WebUI/launch.py "${WEBUI_DIR}/launch.py"
-RUN chown sdwebui:sdwebui "${WEBUI_DIR}/launch.py"
+COPY --chown=${APP_UID}:${APP_GID} WebUI/launch.py "${WEBUI_DIR}/launch.py"
 
 # ------------------------------------------------------------------------------
 # Copy entrypoint scripts (from this repository)
@@ -400,6 +457,34 @@ RUN find / -perm /6000 -type f -not -path '/proc/*' -not -path '/sys/*' -not -pa
 
 # Strip Linux file capabilities (e.g. cap_net_raw+ep) which survive the SUID strip.
 RUN (find / -type f -not -path '/proc/*' -not -path '/sys/*' -not -path '/dev/*' -exec getcap {} + 2>/dev/null || true) | awk -F' ' '{print $1}' | xargs -r setcap -r 2>/dev/null || true
+
+# ------------------------------------------------------------------------------
+# Version labels last: IMAGE_VERSION changes on every commit, so anything after
+# it is rebuilt every time. Keeping it at the end keeps every layer above cached.
+# ------------------------------------------------------------------------------
+
+# Build argument for embedding the image version in OCI labels.
+# Defaults to "dev" for local/untagged builds; CI passes the real version.
+ARG IMAGE_VERSION=dev
+
+# ------------------------------------------------------------------------------
+# OCI image labels — links the GHCR package to this repository, exposes the
+# license, and gives vulnerability scanners (Trivy, Grype, etc.) the source
+# context they need to correlate findings back to the project.
+# Reference: https://github.com/opencontainers/image-spec/blob/main/annotations.md
+# ------------------------------------------------------------------------------
+LABEL org.opencontainers.image.title="SD-WebUI-Forge-Neo-Unraid" \
+  org.opencontainers.image.description="Forge Neo by Haoming02, packaged for Unraid by Aegisnir, with NVIDIA GPU support" \
+  org.opencontainers.image.source="https://github.com/aegisnir/sd-webui-forge-neo-unraid" \
+  org.opencontainers.image.url="https://github.com/aegisnir/sd-webui-forge-neo-unraid" \
+  org.opencontainers.image.licenses="AGPL-3.0-only" \
+  org.opencontainers.image.version="${IMAGE_VERSION}" \
+  sd-webui-forge-neo-unraid.upstream.tag="${WEBUI_TAG}" \
+  sd-webui-forge-neo-unraid.upstream.ref="${WEBUI_REF}"
+
+# Shown in the startup log banner (start.sh).
+ENV IMAGE_VERSION="${IMAGE_VERSION}"
+ENV WEBUI_TAG="${WEBUI_TAG}"
 
 # The container starts as root so entrypoint.sh can self-heal /data ownership.
 # It then drops to sdwebui (UID 99) via setpriv before exec-ing start.sh.

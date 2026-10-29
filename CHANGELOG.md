@@ -12,6 +12,13 @@ I am keeping this intentionally lightweight. This is a personal, AI-assisted hob
 - **Crash loop on first start:** Forge Neo unpacks its bundled tokenizer files into its own program folder on first start, which is read-only in this image (`OSError: [Errno 30] Read-only file system`). The build now unpacks them, and checks their SHA-256 using Neo's own code.
 - **Built-in preprocessor packages installed at startup instead of build time:** Neo skips all extension installers when `<data-dir>/extensions` doesn't exist, so the build never installed the ControlNet preprocessor packages and they were downloaded into `/data/python-user` on first start. The build now creates that folder, so they are baked in and covered by the image scan.
 
+### Changed (build and updates)
+
+- **Build cache:** builds reuse unchanged layers from a `:buildcache` tag in GHCR (`type=registry`, `mode=max`), the same setup as jim60105's image. Updates no longer re-download the 3 GB layer when it didn't change.
+- **Staged build:** Python, PyTorch and Forge Neo are built in a separate stage and copied in with `COPY --link`, so an Ubuntu security update only replaces the system layer. This also removes a `chown -R` that stored Neo's whole folder twice.
+- **Image version moved to the end of the Dockerfile:** it changes on every commit, and declaring it early invalidated every layer after it.
+- **Nightly update check (4 AM ET):** rebuilds with today's Ubuntu updates (monthly: Python packages too), lists every package, and publishes only when that list differs from `package_versions.txt` (linuxserver.io's method).
+
 ### Changed (login page)
 
 - The login page now shows the lockout rule above the form (Gradio's `auth_message`), because Gradio can only answer "Incorrect credentials", even for a locked username.

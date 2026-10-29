@@ -848,6 +848,19 @@ Images are built by GitHub Actions. Every build is pushed as `:sha-<commit>`, sc
 
 For local builds, change the repository to `sd-webui-forge-neo-unraid:local`. When a stable release is promoted, switch to `ghcr.io/aegisnir/sd-webui-forge-neo-unraid:latest`.
 
+### How updates are published
+
+Updates only appear in Unraid when something in the image actually changed. This follows the method [linuxserver.io](https://www.linuxserver.io/) uses.
+
+- **Every night at 4 AM Eastern** a GitHub workflow rebuilds the image with today's Ubuntu security updates (and, once a month, fresh Python packages), then lists every package inside it. It compares that list with [`package_versions.txt`](package_versions.txt) in this repository.
+- **If the list changed**, it saves the new list (so the commit shows exactly which packages changed), then builds, scans and publishes `:dev` as usual.
+- **If nothing changed**, nothing is published, and Unraid shows no update.
+- Code changes and new Forge Neo releases are published when they are merged, as before.
+
+**Downloads stay small.** Builds reuse unchanged layers from a build cache (a `:buildcache` tag in the same package; you never pull it). Python, PyTorch and Forge Neo are built in a separate stage and copied in as their own layers, so an Ubuntu security update only replaces the small system layer, not the 3 GB PyTorch layer. The big layer is downloaded again when PyTorch or a pinned package version changes, and at most about once a month otherwise, because the monthly Python refresh rebuilds that layer even when no package changed (the first update published after the 1st of a month carries it).
+
+**One GitHub quirk:** GitHub turns off scheduled workflows after 60 days without repository activity. The nightly check therefore commits a small "checked" update to `package_versions.txt` once a month even when nothing changed.
+
 ### Maintenance
 
 This image will likely need occasional rebuilds to pick up upstream changes and dependency updates. At a minimum, keep an eye on:

@@ -13,6 +13,13 @@ name: Build Image
 #        tag vX.Y.Z    -> :vX.Y.Z
 #      The sha- tag stays as a rollback point either way.
 #
+# Caching: layers are cached in GHCR under :buildcache (type=registry,
+# mode=max), so unchanged layers keep their digest and Unraid only downloads
+# what changed. APT_REFRESH (today, US Eastern) rebuilds the Ubuntu layer once
+# a day; PY_REFRESH (year-month) rebuilds the Python stage once a month. Both
+# are computed the same way in check-updates.yml, which calls this workflow
+# to publish when the nightly package check finds changes.
+#
 # Authentication uses the workflow's built-in GITHUB_TOKEN (no personal access
 # token). The token only exists for the length of the job.
 #
@@ -32,12 +39,15 @@ on:
       - "LICENSES/**"
       - ".github/ISSUE_TEMPLATE/**"
       - ".github/PULL_REQUEST_TEMPLATE.md"
+      - "package_versions.txt"
   workflow_dispatch:
+  workflow_call:
 
-# One build per ref at a time; a newer push cancels an older running build.
+# One build per ref at a time. Queued, not cancelled, so a nightly publish and
+# a push build can't cancel each other halfway through.
 concurrency:
   group: build-image-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -88,6 +98,9 @@ jobs:
             echo "build_tag=${IMAGE}:sha-${short_sha}"
             echo "channel_tag=${channel:+${IMAGE}:${channel}}"
             echo "version=${version}"
+            # Keep these two in step with check-updates.yml.
+            echo "apt_refresh=$(TZ=America/New_York date +%F)"
+            echo "py_refresh=$(TZ=America/New_York date +%Y-%m)"
           } >> "${GITHUB_OUTPUT}"
 
       - name: Set up Docker Buildx
@@ -109,6 +122,10 @@ jobs:
           tags: ${{ steps.meta.outputs.build_tag }}
           build-args: |
             IMAGE_VERSION=${{ steps.meta.outputs.version }}
+            APT_REFRESH=${{ steps.meta.outputs.apt_refresh }}
+            PY_REFRESH=${{ steps.meta.outputs.py_refresh }}
+          cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=max
           sbom: true
           provenance: mode=max
 
