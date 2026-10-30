@@ -89,8 +89,13 @@
 
 ## In Progress
 
+- Released 2026-10-30: `:latest` published from `main` (now the default branch), listed in Unraid
+  Community Applications, Unraid forum support thread opened. The nightly check now rebuilds `:dev`
+  and `:latest` separately. A real nightly publish through the new per-channel path has not happened
+  yet (no package changes so far).
 - Forge Neo rebase: published as `:dev` and running on the maintainer's server (2026-10-30, image
-  `fb10561`). Working: login and lockout message, HTTPS, image generation, Restart button, extension
+  `fb10561`, later `d32998c`). First-launch password tested on a fresh install: random memorable
+  password shown after the [READY] box, login worked. Working: login and lockout message, HTTPS, image generation, Restart button, extension
   install, launch options (CUDA malloc on, extension auto-update on), Spectrum Integrated, the 10-way
   layer split. Old A1111/Forge flags in Extra Launch Flags are now removed with a note instead of
   stopping Neo.
@@ -113,8 +118,10 @@
   `NVIDIA_DRIVER_CAPABILITIES` in the Dockerfile (the CUDA image set them), then re-test on the maintainer's server.
 - Decide on optional TOTP 2FA and the two Forge Neo build-time patches (XSS escape, safetensors
   header size cap).
-- Re-run fresh install, persistence, and read-only smoke tests before promoting `:latest`.
-- CA App Store submission (deferred until `:latest` is ready).
+- Confirm the app appears in Community Applications once its feed is rebuilt.
+- Test the Lobe Theme fixes with Lobe on and off in a built image.
+- Retire or sync this repository's `template.xml` now that the Community Applications template
+  (in `aegisnir/unraid-templates`) is the main one.
 
 ## Session 14 Changes (adversarial code review remediation)
 

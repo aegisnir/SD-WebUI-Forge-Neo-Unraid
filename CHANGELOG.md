@@ -17,6 +17,12 @@ I am keeping this intentionally lightweight. This is a personal, AI-assisted hob
 - **Lobe Theme layout fixes:** a CSS-only built-in extension, `lobe-theme-fixes`, for [Lobe Theme](https://github.com/lobehub/sd-webui-lobe-theme) on Forge Neo.  It fixes the giant white triangle on the VAE / Text Encoder dropdown, the Quick Settings panel sliding out of view when that dropdown is clicked, and the Settings section list squashed to one letter per line.  Every rule applies only while Lobe is loaded, so the default UI is unchanged.
 - **Old AUTOMATIC1111 and Forge flags are removed from Extra Launch Flags** instead of stopping Forge Neo at startup. Neo exits on any flag it doesn't know, and guides written for A1111 still recommend flags like `--opt-sdp-attention`, `--xformers-flash-attention`, `--medvram` and `--no-half-vae`. 81 dropped flags (A1111 v1.10.1 and the original Forge, compared with Forge Neo 2.31) are now removed with a log line naming the replacement. This includes A1111's `--ckpt` and `--gfpgan-model`, which Neo would otherwise misread as shortened forms of its folder flags.
 
+### Added (release)
+
+- **Community Applications listing:** the app is in Unraid Community Applications.  Its template lives in [aegisnir/unraid-templates](https://github.com/aegisnir/unraid-templates) and asks at install whether you want `latest` (stable) or `dev` (testing).
+- **`:latest` is published** from `main`.
+- **Support thread** on the Unraid forum: https://forums.unraid.net/topic/201112-support-aegisnir-sd-webui-forge-neo-unraid/
+
 ### Changed
 
 - **`:latest` now gets the nightly security rebuilds too.**  The 4 AM check used to rebuild only `:dev`.  It now checks `dev` and `main` separately, and publishes `:dev` or `:latest` only when that image's package list changed.  The single `package_versions.txt` is split into `package_versions.dev.txt` and `package_versions.latest.txt`, both kept on `dev`.
