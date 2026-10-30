@@ -89,21 +89,20 @@
 
 ## In Progress
 
-- Forge Neo rebase: first image built, passed the Trivy gate, and published as `:dev` (2026-10-29).
-  Next: the test on the maintainer's server (checklist in the maintainer's vault note).
+- Forge Neo rebase: published as `:dev` and running on the maintainer's server (2026-10-30). Working:
+  login and lockout message, HTTPS, image generation, Restart button, extension install, launch
+  options (CUDA malloc on, extension auto-update on), Spectrum Integrated, the 10-way layer split
+  (first pull completed in pieces).
 
 ## Remaining
 
-- Test on the maintainer's server as a second container on port 7861 with a separate test data folder and one
-  copied checkpoint: login, one image, Restart button, one extension, clean logs, login lockout,
-  speed vs the old xformers setup.
-- Watch the first nightly update check (`check-updates.yml`, 4 AM ET) and the first build with the
-  registry cache: the second build after it should reuse the PyTorch layer.
-- Verify the 10-way Python layer split on the maintainer's server: the first pull downloads all 10 pieces once; on the
-  next update they should all say "Already exists".
-- Test the launch options on the maintainer's server: re-download the template and re-create the container from
-  it (Unraid doesn't add new template fields to an existing container); check the log for the
-  removed-flag notes and that CUDA malloc is on.
+- Nightly update check (`check-updates.yml`): has not run yet (no scheduled run on 2026-10-30;
+  GitHub delays scheduled runs under load). Run it once by hand to create `package_versions.txt`,
+  then confirm the scheduled run fires.
+- On the next published update: every Python layer and the Neo layer should say "Already exists".
+- Speed: compare CUDA malloc on vs off (batch of 5, fixed seed, run twice), then against the
+  previous xformers-based setup.
+- Investigate `driverInitFileInfo 599 result=11` log lines (generation works).
 - After the first build works: switch the base image to plain `ubuntu:24.04` (digest-pinned).
   Ubuntu 22.04 standard support ends April 2027, and the `nvidia/cuda` base duplicates the CUDA
   libraries the torch wheels already install. Set `NVIDIA_VISIBLE_DEVICES` and
