@@ -150,6 +150,32 @@ exec_as_app_user() {
 # If neither condition applies, /data is healthy and we skip straight to the
 # privilege drop.
 
+# ── Folders mapped in separately under /data ──────────────────────────────
+# A user can map other shares inside /data: the template's optional Models and
+# Outputs directories, or any extra path. Another app may use them, so the
+# repair below never changes their owner or modes (find prunes them); the
+# check after the repair only warns when the app user can't write to one.
+# Mount points come from /proc/self/mountinfo (field 5, with spaces escaped
+# as \040; field 6 holds the mount options).
+DATA_SUBMOUNTS=()
+DATA_SUBMOUNT_OPTS=()
+if [[ -r /proc/self/mountinfo ]]; then
+  while IFS=$'\t' read -r _mp _opts; do
+    DATA_SUBMOUNTS+=("${_mp}")
+    DATA_SUBMOUNT_OPTS+=("${_opts}")
+  done < <(awk -v d="${DATA_DIR}" '{ mp = $5; gsub(/\\040/, " ", mp); if (mp != d && index(mp, d "/") == 1) print mp "\t" $6 }' /proc/self/mountinfo)
+fi
+# find expression that skips every separate mount: ( -path A -o -path B ) -prune -o
+PRUNE_SUBMOUNTS=()
+if (( ${#DATA_SUBMOUNTS[@]} > 0 )); then
+  PRUNE_SUBMOUNTS=("(")
+  for _mp in "${DATA_SUBMOUNTS[@]}"; do
+    (( ${#PRUNE_SUBMOUNTS[@]} > 1 )) && PRUNE_SUBMOUNTS+=("-o")
+    PRUNE_SUBMOUNTS+=("-path" "${_mp}")
+  done
+  PRUNE_SUBMOUNTS+=(")" "-prune" "-o")
+fi
+
 # Only attempt ownership/permission repair if we are running as root.
 # If the container was started with --user 99:100 (skipping the root entrypoint
 # pattern), we are already the app user and cannot chown/chmod anything.
@@ -177,8 +203,8 @@ if [[ "$(id -u)" == "0" ]] && [[ -d "${DATA_DIR}" ]]; then
     # find's filter (! -user) limits the walk to only misowned entries so this
     # is fast on a healthy volume and only slow on a truly broken one.
     _repair_errors="$(mktemp 2>/dev/null || echo /tmp/entrypoint-repair.err)"
-    _repair_count="$(find "${DATA_DIR}" -not -type l \( ! -user "${EXPECTED_UID}" -o ! -group "${EXPECTED_GID}" \) 2>/dev/null | wc -l | tr -d ' ')"
-    find "${DATA_DIR}" -not -type l \( ! -user "${EXPECTED_UID}" -o ! -group "${EXPECTED_GID}" \) -exec chown "${EXPECTED_UID}:${EXPECTED_GID}" {} + 2>"${_repair_errors}" || true
+    _repair_count="$(find "${DATA_DIR}" "${PRUNE_SUBMOUNTS[@]}" -not -type l \( ! -user "${EXPECTED_UID}" -o ! -group "${EXPECTED_GID}" \) -print 2>/dev/null | wc -l | tr -d ' ')"
+    find "${DATA_DIR}" "${PRUNE_SUBMOUNTS[@]}" -not -type l \( ! -user "${EXPECTED_UID}" -o ! -group "${EXPECTED_GID}" \) -exec chown "${EXPECTED_UID}:${EXPECTED_GID}" {} + 2>"${_repair_errors}" || true
     if [[ -s "${_repair_errors}" ]]; then
       echo "${C_WARN}[entrypoint] Some files could not be repaired:${C_RESET}" >&2
       head -5 "${_repair_errors}" >&2
@@ -186,8 +212,8 @@ if [[ "$(id -u)" == "0" ]] && [[ -d "${DATA_DIR}" ]]; then
     rm -f "${_repair_errors}"
 
     # Restore sane permission modes after ownership repair.
-    find "${DATA_DIR}" -type d ! -perm -u+rwx -exec chmod u+rwx {} + 2>/dev/null || true
-    find "${DATA_DIR}" -type f ! -perm -u+r   -exec chmod u+r   {} + 2>/dev/null || true
+    find "${DATA_DIR}" "${PRUNE_SUBMOUNTS[@]}" -type d ! -perm -u+rwx -exec chmod u+rwx {} + 2>/dev/null || true
+    find "${DATA_DIR}" "${PRUNE_SUBMOUNTS[@]}" -type f ! -perm -u+r   -exec chmod u+r   {} + 2>/dev/null || true
 
     echo "${C_INFO}[entrypoint] Repaired ${_repair_count} files under /data. Continuing startup.${C_RESET}" >&2
 
@@ -197,10 +223,38 @@ if [[ "$(id -u)" == "0" ]] && [[ -d "${DATA_DIR}" ]]; then
   # ([[ ! -w || ! -x ]]) was dead code: root bypasses -w/-x via CAP_DAC_OVERRIDE.
   else
     chmod 775 "${DATA_DIR}" 2>/dev/null || true
-    find "${DATA_DIR}" -type d ! -perm -u+rwx -exec chmod u+rwx {} + 2>/dev/null || true
-    find "${DATA_DIR}" -type f ! -perm -u+r   -exec chmod u+r   {} + 2>/dev/null || true
+    find "${DATA_DIR}" "${PRUNE_SUBMOUNTS[@]}" -type d ! -perm -u+rwx -exec chmod u+rwx {} + 2>/dev/null || true
+    find "${DATA_DIR}" "${PRUNE_SUBMOUNTS[@]}" -type f ! -perm -u+r   -exec chmod u+r   {} + 2>/dev/null || true
   fi
 fi
+
+# Report separately mapped folders: left as they are, and whether the app user
+# can write to them (owner, group or other write+search bits, or a read-only
+# mount). Warning only; startup continues.
+for _i in "${!DATA_SUBMOUNTS[@]}"; do
+  _mp="${DATA_SUBMOUNTS[${_i}]}"
+  _why=""
+  if [[ ",${DATA_SUBMOUNT_OPTS[${_i}]}," == *",ro,"* ]]; then
+    _why="it is mapped read-only"
+    _fix="map it read/write in the template"
+  else
+    _uid="$(stat -c '%u' "${_mp}" 2>/dev/null || echo -1)"
+    _gid="$(stat -c '%g' "${_mp}" 2>/dev/null || echo -1)"
+    _mode=$(( 8#$(stat -c '%a' "${_mp}" 2>/dev/null || echo 0) ))
+    if [[ "${_uid}" == "${EXPECTED_UID}" ]]; then _bits=$(( (_mode >> 6) & 3 ))
+    elif [[ "${_gid}" == "${EXPECTED_GID}" ]]; then _bits=$(( (_mode >> 3) & 3 ))
+    else _bits=$(( _mode & 3 )); fi
+    (( _bits == 3 )) || _why="it is owned by uid=${_uid}:gid=${_gid} (mode $(printf '%o' "${_mode}"))"
+    _fix="chown -R nobody:users <that folder> on the server, or set APP_UID/APP_GID to its owner"
+  fi
+  if [[ -n "${_why}" ]]; then
+    echo "${C_WARN}[entrypoint] WARNING: ${_mp} is a separate folder mapped in from your server, and uid ${EXPECTED_UID} can't write to it: ${_why}.${C_RESET}" >&2
+    echo "${C_WARN}[entrypoint]   The container leaves it unchanged. The WebUI needs write access there.${C_RESET}" >&2
+    echo "${C_WARN}[entrypoint]   Fix: ${_fix}.${C_RESET}" >&2
+  else
+    echo "${C_INFO}[entrypoint] ${_mp} is mapped in separately; left as it is (writable).${C_RESET}" >&2
+  fi
+done
 
 # ─────────────────────────────────────────────────────────────────────────────
 # /config ownership self-healing

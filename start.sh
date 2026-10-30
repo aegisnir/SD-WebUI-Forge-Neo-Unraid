@@ -194,10 +194,13 @@ mkdir -p "${PYTHONUSERBASE}"
 # Ensure standard data subtrees exist so the WebUI finds expected paths on a
 # fresh or restored /data volume without requiring the user to re-create them.
 # Neo's default output folder is /data/output (A1111 used /data/outputs).
-mkdir -p /data/models/Stable-diffusion
-mkdir -p /data/models/VAE
-mkdir -p /data/models/Lora
-mkdir -p /data/output
+# The optional Models and Outputs directories can be separate mounts that the
+# container doesn't own; warn instead of stopping if one isn't writable
+# (entrypoint.sh has already explained why).
+for _dir in /data/models/Stable-diffusion /data/models/VAE /data/models/Lora /data/output; do
+  mkdir -p "${_dir}" 2>/dev/null \
+    || echo "${C_WARN}WARNING: could not create ${_dir}; the folder mapped there is not writable by uid $(id -u).${C_RESET}" >&2
+done
 mkdir -p /data/extensions
 mkdir -p /config/auth
 
@@ -343,30 +346,21 @@ then
   exit 1
 fi
 
-# ── Flags the A1111 image used that Forge Neo removed ────────────────────────
-# Neo stops at startup on any unknown flag. These were common in A1111 setups
-# (including this container's old default Extra Args), so drop them with a
-# warning instead of failing. Removing them never lowers security:
-#   --no-download-sd-model  Neo never downloads a model on its own
-#   --disable-safe-unpickle Neo always loads checkpoints with weights_only=True
-#   --allow-code            the custom-code script no longer exists
-if [[ -n "${COMMANDLINE_ARGS:-}" ]]; then
-  _cleaned_args="$("${PYTHON_BIN}" - <<'PY'
-import os
-import shlex
-import sys
-
-removed = {"--no-download-sd-model", "--disable-safe-unpickle", "--allow-code"}
-args = shlex.split(os.environ.get("COMMANDLINE_ARGS", ""))
-kept = [a for a in args if a not in removed]
-for a in args:
-    if a in removed:
-        print(f"Removed flag not supported by Forge Neo: {a}", file=sys.stderr)
-print(shlex.join(kept))
-PY
-)"
-  export COMMANDLINE_ARGS="${_cleaned_args}"
+# ── Launch options → Forge Neo flags ────────────────────────────────────────
+# neo_args.py turns the template's NEO_* options into Neo's flags, always adds
+# --listen --port 7860 --data-dir /data, and appends COMMANDLINE_ARGS (the
+# template's "Extra Launch Flags") minus anything an option controls, the
+# container manages, or this container doesn't allow. Everything below
+# (auth, API, TLS) reads the resulting COMMANDLINE_ARGS. A bad option value
+# exits 78: no restart loop, the message says what to fix.
+NEO_ARGS_PY="${NEO_ARGS_PY:-/usr/local/lib/sd-webui-forge-neo-unraid/neo_args.py}"
+_neo_args_rc=0
+_built_args="$("${PYTHON_BIN}" "${NEO_ARGS_PY}" 2> >(while IFS= read -r line; do echo "${C_WARN}${line}${C_RESET}" >&2; done))" || _neo_args_rc=$?
+if [[ "${_neo_args_rc}" -ne 0 ]]; then
+  echo "${C_CRIT}${C_BOLD}FATAL:${C_RESET}${C_CRIT} Fix the launch option named above in the container template, then start the container again.${C_RESET}" >&2
+  exit "${EXIT_CONFIG}"
 fi
+export COMMANDLINE_ARGS="${_built_args}"
 
 # ── Auth argument construction ────────────────────────────────────────────────
 # AUTH_ARGS accumulates --gradio-auth-path and/or --api-auth flags that get
@@ -489,9 +483,9 @@ fi
 API_ENABLED=0
 if [[ -n "${COMMANDLINE_ARGS:-}" && " ${COMMANDLINE_ARGS} " =~ [[:space:]]--api([=[:space:]]|$) ]]; then
   API_ENABLED=1
-  echo "${C_INFO}API is explicitly enabled via COMMANDLINE_ARGS (--api).${C_RESET}" >&2
+  echo "${C_INFO}API is on (template option API / API only).${C_RESET}" >&2
 else
-  echo "${C_ACCENT}API is disabled by default. Add --api to COMMANDLINE_ARGS to enable it.${C_RESET}" >&2
+  echo "${C_ACCENT}API is off (default). Set the template option API (NEO_API) to true to turn it on.${C_RESET}" >&2
 fi
 
 if [[ "${API_ENABLED}" == "1" ]]; then
@@ -766,7 +760,7 @@ monitor_webui_output() {
       echo "  │  Other tips:                                                        │"
       echo "  │    • Disable Hires. fix or reduce its scale (biggest VRAM saver)    │"
       echo "  │    • Reduce image resolution or batch size                          │"
-      echo "  │    • Add --lowvram to COMMANDLINE_ARGS (slower, uses less VRAM)     │"
+      echo "  │    • Set VRAM mode to lowvram in the template (slower, less VRAM)   │"
       echo "  ╰─────────────────────────────────────────────────────────────────────╯${C_RESET}"
       echo ""
     fi

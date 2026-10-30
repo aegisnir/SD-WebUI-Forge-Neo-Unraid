@@ -51,6 +51,7 @@ grep -n "<ExtraParams>\|<Privileged>" template.xml
 - [ ] PASS if `entrypoint.sh` performs limited root-only setup and then drops to uid 99/gid 100 before running the app.
 - [ ] PASS if `start.sh` refuses to run as root (`id -u == 0` check).
 - [ ] PASS if entrypoint diagnostics include runtime context for blocked host/runtime policies (NoNewPrivs, Seccomp, CapEff).
+- [ ] PASS if the `/data` ownership repair never changes owners or modes inside a separate mount point under `/data` (it prunes every mount point listed in `/proc/self/mountinfo`) and only warns about it.
 
 Verification command:
 
@@ -131,6 +132,12 @@ grep -n 'umask 077' start.sh
 - [ ] PASS if the self-signed private key is created under `umask 077` and `/config/tls` is mode 700.
 - [ ] PASS if `WEBUI_TLS_HOSTNAMES` entries are validated against a strict hostname/IPv4 pattern before reaching `openssl`.
 - [ ] PASS if `start.sh` never adds `--disable-tls-verify` (verification uses the `SSL_CERT_FILE` trust bundle instead).
+
+### Launch options
+
+- [ ] PASS if `WebUI/neo_args.py` always emits `--listen --port 7860 --data-dir /data` itself and removes those flags from `COMMANDLINE_ARGS`.
+- [ ] PASS if `--share`, `--ngrok`, `--ngrok-options` and `--ngrok-region` are removed from `COMMANDLINE_ARGS` and cannot be produced by any option.
+- [ ] PASS if an invalid option value stops startup with exit code 78 (no restart loop), and every value that reaches the command line comes from a fixed list or is validated (number, absolute path, subpath characters).
 
 ### Gradio file serving
 

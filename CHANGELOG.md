@@ -12,6 +12,18 @@ I am keeping this intentionally lightweight. This is a personal, AI-assisted hob
 - **Crash loop on first start:** Forge Neo unpacks its bundled tokenizer files into its own program folder on first start, which is read-only in this image (`OSError: [Errno 30] Read-only file system`). The build now unpacks them, and checks their SHA-256 using Neo's own code.
 - **Built-in preprocessor packages installed at startup instead of build time:** Neo skips all extension installers when `<data-dir>/extensions` doesn't exist, so the build never installed the ControlNet preprocessor packages and they were downloaded into `/data/python-user` on first start. The build now creates that folder, so they are baked in and covered by the image scan.
 
+### Added (template: launch options)
+
+- **Launch options instead of a flag string.** About 40 Forge Neo flags are template options (dropdowns), common ones visible and the rest under "Show more settings" (`NEO_*` variables). Defaults match Forge Neo (all off), except two maintainer's choices: extension installs from the WebUI and `--cuda-malloc` (Neo's own RTX recommendation), both on.
+- **Extra Launch Flags** (`COMMANDLINE_ARGS`) is now empty by default and added after the options. Flags controlled by an option, flags the container manages (`--listen`, `--port`, `--data-dir`, ...) and flags not allowed in a container (`--share`, `--ngrok`, ...) are removed with a log message. Existing containers' old value keeps working.
+- **Optional Models and Outputs directories** (`/data/models`, `/data/output`).
+- **`NVIDIA_VISIBLE_DEVICES`** (default `all`) and **`NVIDIA_DRIVER_CAPABILITIES`** (`compute,utility`) in the template.
+- README: every Extra Parameters flag explained in plain English, with what happens if you remove it.
+
+### Fixed (ownership repair)
+
+- Startup no longer re-owns folders mapped in separately inside `/data` (for example a models share). It warns, with the fix, when the WebUI can't write to one.
+
 ### Changed (build and updates)
 
 - **Build cache:** builds reuse unchanged layers from a `:buildcache` tag in GHCR (`type=registry`, `mode=max`), the same setup as jim60105's image. Updates no longer re-download the 3 GB layer when it didn't change.

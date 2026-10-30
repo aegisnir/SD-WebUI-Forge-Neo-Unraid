@@ -306,9 +306,10 @@ ARG APP_GID=100
 # PyTorch's built-in scaled_dot_product_attention, which Neo's README calls
 # "usually as fast, and also more stable".
 # ------------------------------------------------------------------------------
-# --enable-insecure-extension-access: lets logged-in users install extensions
-# from the WebUI. On by default (owner decision); see README "Extensions".
-ENV COMMANDLINE_ARGS="--listen --port 7860 --data-dir /data --enable-insecure-extension-access"
+# Launch flags come from the template's NEO_* options (WebUI/neo_args.py, run
+# by start.sh), which also always adds --listen --port 7860 --data-dir /data.
+# COMMANDLINE_ARGS is the template's "Extra Launch Flags": empty by default.
+ENV COMMANDLINE_ARGS=""
 ENV WEBUI_DIR="/opt/forge-neo"
 ENV PYTHONUSERBASE="/data/python-user"
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -403,6 +404,7 @@ COPY --chown=${APP_UID}:${APP_GID} WebUI/launch.py "${WEBUI_DIR}/launch.py"
 # ------------------------------------------------------------------------------
 COPY entrypoint.sh /entrypoint.sh
 COPY start.sh /start.sh
+COPY WebUI/neo_args.py /usr/local/lib/sd-webui-forge-neo-unraid/neo_args.py
 COPY webui-auth.txt /webui-auth.txt
 RUN chmod 0755 /entrypoint.sh /start.sh \
   && chmod 0644 /webui-auth.txt \

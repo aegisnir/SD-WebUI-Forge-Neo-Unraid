@@ -36,7 +36,8 @@ I built this container for my own Unraid server and the way I use it, then share
 
 | Default | Why I chose it | The trade-off | How to change it |
 |---|---|---|---|
-| Installing extensions from the WebUI is **on** | I install extensions from the WebUI | Anyone who can log in can run code in the container | Remove `--enable-insecure-extension-access` from Extra Args ([details](#extension-management-is-on-by-default)) |
+| Installing extensions from the WebUI is **on** | I install extensions from the WebUI | Anyone who can log in can run code in the container | Set **Install extensions from the WebUI** to `false` ([details](#extension-management-is-on-by-default)) |
+| **CUDA malloc** is on | Forge Neo's own log recommends it on RTX cards | Rarely, memory errors on some setups | Set **CUDA malloc** to `false` ([details](#launch-options)) |
 | Gradio **4.44.1** instead of Forge Neo's 4.40.0 | Fixes 5 known vulnerabilities | Not tested by Forge Neo; parts of the UI may break | [Build with Gradio 4.40.0](#build-with-the-original-gradio-4400) |
 | Newer **GitPython, diffusers and setuptools** than Forge Neo pins | Fixes 10 high-rated vulnerabilities | Not tested by Forge Neo; may break | Build with `--build-arg GITPYTHON_VERSION=3.1.62` (and `DIFFUSERS_VERSION`, `SETUPTOOLS_VERSION`), the same way as [the Gradio build](#build-with-the-original-gradio-4400) |
 | A starter login `admin` / `changeme` is created and the WebUI still starts | The WebUI is never without a login, and first setup stays simple | Weak until you change it | Change the password in the auth file ([details](#authentication-defaults)) |
@@ -61,7 +62,8 @@ I built this container for my own Unraid server and the way I use it, then share
 - [Configuration](#configuration)
   - [Authentication](#authentication-defaults)
   - [Login protection](#login-protection)
-  - [COMMANDLINE_ARGS](#commandline_args)
+  - [Launch options](#launch-options)
+  - [COMMANDLINE_ARGS (Extra Launch Flags)](#commandline_args)
   - [HTTPS / TLS](#https--tls)
   - [Data Directory](#--data-dir)
 - [Storage and Permissions](#storage-and-permissions)
@@ -386,13 +388,25 @@ The container uses two main mount points. Here is where everything lives:
 
 **Why two paths?** `/config` holds small configuration files that belong in your appdata backup. `/data` holds large, fast-growing content (models, outputs, extensions) that should live on a drive with plenty of space, preferably an SSD.
 
+### Optional: separate Models and Outputs folders
+
+**The Data Directory handles everything on its own.** Models and outputs live inside it unless you say otherwise. The template has two more paths, **Models Directory** (`/data/models`) and **Outputs Directory** (`/data/output`). They are optional, for more granular control. Leave them empty and nothing changes.
+
+Fill one in when you want, for example:
+- models on their own share, to share them with another app or keep them on a different pool, or
+- outputs on a share you browse from another computer.
+
+What happens when you fill one in:
+- That folder is mapped over the matching folder inside the Data Directory. Whatever was in the Data Directory's own `models` (or `output`) folder is hidden while the mapping is set, so move your files over first.
+- **The container never changes the ownership of these folders.** If the WebUI user (`99:100` by default) can't write to one, the log shows a warning with the fix. The WebUI needs write access to Models too, because it creates model subfolders and some features download into them.
+
 ---
 
 ## Configuration
 
 ### Authentication defaults
 
-This container enables the WebUI login page by default. The API is disabled by default unless you explicitly add `--api` to `COMMANDLINE_ARGS`.
+This container enables the WebUI login page by default. The API is disabled by default unless you set the **API** option (`NEO_API`) to `true`.
 
 > [!IMPORTANT]
 > **Maintainer's choice.** The container creates a starter login and still starts, so the WebUI is never left without one. The trade-off is a weak password until you change it, and the log keeps warning until you do.
@@ -488,44 +502,114 @@ Gradio's login page has no limit on password guesses. This container adds one. I
 
 **Two-factor login and passkeys** are not possible on Gradio's login page. For those, put an authenticating reverse proxy in front, such as [Authelia](https://www.authelia.com/) or [Authentik](https://goauthentik.io/).
 
+### Launch options
+
+Forge Neo has about 140 launch flags. Instead of typing them, the Unraid template asks for the useful ones as options: dropdowns with a one-line explanation each. The container turns them into Neo's flags at startup.
+
+- **Defaults match Forge Neo's** (every flag off), with two exceptions marked *maintainer's choice* below.
+- **Common options** are always visible. **Advanced options** are under **Show more settings** in the template.
+- Options that only work together say so. For example, *API request logging* does nothing unless *API* is `true`.
+- Everything not offered as an option still works through [Extra Launch Flags](#commandline_args).
+
+> [!NOTE]
+> **Set by the container, never shown:** `--listen --port 7860 --data-dir /data`. Changing these breaks the WebUI (it becomes unreachable, or loses your data folder), so they are not options. To use a different port, change **WebUI** in the template: that is the port on your server, and it maps to 7860 inside the container.
+
+**Common options:**
+
+| Option (variable) | Flag | Default | Notes |
+|---|---|---|---|
+| Install extensions from the WebUI (`NEO_EXTENSION_ACCESS`) | `--enable-insecure-extension-access` | `true` | *Maintainer's choice* (Neo: `false`). Anyone who can log in can install code. See [Extensions](#extension-management-is-on-by-default) |
+| API (`NEO_API`) | `--api` | `false` | Needed by every other API option, and by `API_AUTH_FILE_MODE` |
+| API only, no WebUI (`NEO_API_ONLY`) | `--nowebui` | `false` | Turns the API on by itself; the browser UI is not started |
+| CUDA malloc (`NEO_CUDA_MALLOC`) | `--cuda-malloc` | `true` | *Maintainer's choice* (Neo: `false`), see the warning below |
+| CUDA streams (`NEO_CUDA_STREAM`) | `--cuda-stream N` | `off` | `2` or `4`. Faster offloading of model weights between RAM and VRAM |
+| Pin shared memory (`NEO_PIN_SHARED_MEMORY`) | `--pin-shared-memory` | `false` | Better RAM use when models are offloaded |
+| VRAM mode (`NEO_VRAM_MODE`) | `--gpu-only` / `--highvram` / `--lowvram` / `--novram` | `normal` | One dropdown, because Neo only accepts one. `lowvram` for GPUs with little memory; `highvram` keeps models in VRAM |
+| Attention package (`NEO_ATTENTION_PACKAGE`) | `--xformers` / `--sage` / `--flash` | `none` | `none` uses PyTorch's built-in attention, which Neo calls "usually as fast, and also more stable". A package is **downloaded and installed at startup** into `/data/python-user`; it is not part of the scanned image. xformers does not support RTX 50 cards |
+| Theme (`NEO_THEME`) | `--theme` | `default` | `dark` or `light` |
+
+> [!WARNING]
+> **CUDA malloc is on by default** (*maintainer's choice*). Forge Neo itself recommends it: on RTX cards its log prints "Hint: your device supports --cuda-malloc for potential speed improvements". On older cards Neo can't use it, Neo skips it automatically. If you see CUDA memory errors or crashes after a change, set **CUDA malloc** to `false` first.
+
+**Advanced options** (under **Show more settings**):
+
+| Option (variable) | Flag | Default | Notes |
+|---|---|---|---|
+| API request logging (`NEO_API_LOG`) | `--api-log` | `false` | **Needs API = `true`.** Logs every API request |
+| API server stop/restart (`NEO_API_SERVER_STOP`) | `--api-server-stop` | `false` | **Needs API = `true`.** Lets API clients stop or restart the server |
+| Expandable segments (`NEO_EXPANDABLE_SEGMENTS`) | `--expandable-segments` | `false` | Experimental PyTorch allocator; may prevent out-of-memory errors |
+| Fast fp8 (`NEO_FAST_FP8`) | `--fast-fp8` | `false` | For `float8_e4m3fn` models |
+| Fast fp16 (`NEO_FAST_FP16`) | `--fast-fp16` | `false` | fp16 accumulation |
+| Autotune (`NEO_AUTOTUNE`) | `--autotune` | `false` | cuDNN benchmark. Neo: "slower in my experience" |
+| Comfy-Kitchen attention (`NEO_CK_ATTENTION`) | `--use-ck-attention` | `false` | Overrides other attention packages |
+| Triton backend (`NEO_TRITON_BACKEND`) | `--enable-triton-backend` | `false` | For Comfy-Kitchen; *might* speed things up |
+| pyNVML VRAM tracking (`NEO_PYNVML`) | `--pynvml` | `false` | More accurate free-VRAM readings. Installs a package at startup |
+| Nunchaku (`NEO_NUNCHAKU`) | `--nunchaku` | `false` | For SVDQ models. Installs a package at startup |
+| Tiled Conv2d (`NEO_TILED_CONV2D`) | `--tiled-conv2d` | `0` | `64`-`512`: less VRAM for the VAE, slower |
+| Reserve VRAM, GB (`NEO_RESERVE_VRAM`) | `--reserve-vram` | empty | VRAM to leave for other programs, for example `2` |
+| Disable smart memory (`NEO_DISABLE_SMART_MEMORY`) | `--disable-smart-memory` | `false` | Offload to RAM aggressively |
+| Force non-blocking (`NEO_FORCE_NON_BLOCKING`) | `--force-non-blocking` | `false` | |
+| Precision (`NEO_PRECISION`) | `--force-fp32` / `--force-fp16` | `auto` | |
+| Diffusion model precision (`NEO_UNET_PRECISION`) | `--fp32-unet`, `--bf16-unet`, ... | `auto` | |
+| VAE precision (`NEO_VAE_PRECISION`) | `--fp32-vae`, `--bf16-vae`, `--fp16-vae` | `auto` | `fp16` may cause black images |
+| Text encoder precision (`NEO_TEXT_ENC_PRECISION`) | `--fp32-text-enc`, ... | `auto` | |
+| VAE on CPU (`NEO_CPU_VAE`) / Text encoder on CPU (`NEO_CPU_TEXT_ENC`) | `--cpu-vae` / `--cpu-text-enc` | `false` | Saves VRAM, much slower |
+| Disable sage / flash / xformers (`NEO_DISABLE_SAGE`, `NEO_DISABLE_FLASH`, `NEO_DISABLE_XFORMERS`) | `--disable-...` | `false` | Skip an installed attention package |
+| Models folder override (`NEO_MODEL_REF`) | `--model-ref` | empty | **Needs a Path mapping first.** A container path, for example `/models`. Replaces the `models` folder instead of adding to it. The optional **Models Directory** path below is usually simpler |
+| ComfyUI models (`NEO_COMFY_MODELS`) | `--forge-ref-comfy-home` | empty | **Needs a Path mapping first.** Map your ComfyUI folder (for example to `/comfyui`), then enter that container path to load its models too |
+| A1111 models (`NEO_A1111_MODELS`) | `--forge-ref-a1111-home` | empty | **Needs a Path mapping first.** Same idea for an AUTOMATIC1111 install |
+| Lock settings (`NEO_FREEZE_SETTINGS`) | `--freeze-settings` | `false` | Nobody can change settings in the WebUI |
+| Hide folder settings (`NEO_HIDE_UI_DIR_CONFIG`) | `--hide-ui-dir-config` | `false` | Hides output-folder settings in the WebUI |
+| Extensions (`NEO_EXTENSIONS`) | `--disable-extra-extensions` / `--disable-all-extensions` | `enabled` | `builtin-only` or `disabled`, for troubleshooting a broken extension |
+| Update extensions on start (`NEO_UPDATE_EXTENSIONS`) | `--update-all-extensions` | `false` | Pulls updates for every extension on each start |
+| Reverse-proxy subpath (`NEO_SUBPATH`) | `--subpath` | empty | For a reverse proxy serving the WebUI under a path, for example `sd` |
+| No checkpoint hashing (`NEO_NO_HASHING`) | `--no-hashing` | `false` | Faster model loading; model hashes are missing from image info |
+| Log level (`NEO_LOGLEVEL`) | `--loglevel` | `default` | `DEBUG` to `CRITICAL` |
+
+A value the container doesn't understand (for example `NEO_VRAM_MODE=medium`) stops startup with a message naming the option and the allowed values. It does not restart in a loop.
+
 ### `COMMANDLINE_ARGS`
 
-`COMMANDLINE_ARGS` is passed directly to `launch.py`.
+This is the template's **Extra Launch Flags** field: anything not covered by the options above. It is empty by default, and is added after the options.
+
+- **The options always win.** If a flag here is also controlled by an option (for example `--api` or `--cuda-malloc`), it is removed, and the log names the option to use instead. That way there is one place to change each setting.
+- **Flags the container manages are removed** with a log message: `--listen`, `--port`, `--data-dir`, `--ui-config-file`, `--ui-settings-file`, `--reinstall-torch`, `--reinstall-xformers`, `--uv`, `--uv-symlink`, `--uv-local-cache`, `--dump-sysinfo`.
+- **Flags not allowed in this container are removed** with a reason: `--share`, `--ngrok`, `--ngrok-options`, `--ngrok-region` (public internet tunnels; use a reverse proxy or a Cloudflare Tunnel instead), `--autolaunch` (no browser in a container), `--server-name` (conflicts with `--listen`), `--directml`, `--cpu` (this image is for NVIDIA GPUs), `--add-stop-route`, `--administrator` (no effect or undocumented). Old A1111 flags Neo doesn't have (`--no-download-sd-model`, `--disable-safe-unpickle`, `--allow-code`) are removed too.
+- **Your own HTTPS and login flags are respected:** `--tls-keyfile`/`--tls-certfile` and `--gradio-auth`/`--gradio-auth-path`/`--api-auth` switch off the container's own handling of those, as described in their sections.
+- Forge Neo stops at startup on any other flag it doesn't know, so check spelling.
+
+Existing containers keep working: the old default value (`--listen --port 7860 --data-dir /data --enable-insecure-extension-access`) has its duplicates removed with a note.
 
 > [!NOTE]
 > **Log redaction:** Sensitive auth flags (`--gradio-auth`, `--gradio-auth-path`, `--api-auth`) have their values replaced with `<redacted>` in startup log output. The flag names remain visible so you can confirm they are active.
 
-**Default** (from the Unraid template):
-
-```
---listen --port 7860 --data-dir /data --enable-insecure-extension-access
-```
-
-> [!WARNING]
-> Forge Neo stops at startup on any flag it does not know. Check [Neo's flag list](https://github.com/Haoming02/sd-webui-forge-classic/tree/neo) before adding one. Three common A1111 flags that Neo removed (`--no-download-sd-model`, `--disable-safe-unpickle`, `--allow-code`) are dropped automatically with a log message.
-
 > [!TIP]
-> The container automatically appends `--gradio-auth-path <runtime-auth-file>` at launch (see [Authentication](#authentication-defaults)). You do not need to add auth flags yourself. They are injected by `start.sh` based on your `WEBUI_AUTH_FILE`.
-
-API is intentionally not part of the default args. Add `--api` only when you explicitly need API access.
-
-Use the defaults as a starting point, then tune for your own hardware, risk tolerance, and workflow.
-
-For a complete list of supported arguments, see the [Forge Neo README](https://github.com/Haoming02/sd-webui-forge-classic/tree/neo).
-
-> [!TIP]
-> **More detail below:** click **Flag details and security considerations** to expand it.
+> **More detail below:** click **Flags you can only set here** to expand it.
 
 <details>
-<summary><b>🔽 Click to expand: Flag details and security considerations</b></summary>
+<summary><b>🔽 Click to expand: Flags you can only set here</b></summary>
 
-- **Attention (`--xformers`, `--sage`, `--flash`)** (not set by default): The image ships without these packages, so Neo uses PyTorch's built-in attention, which Neo's README calls "usually as fast, and also more stable". These flags only *install* the package (into `/data/python-user`) on the next start. Once installed, Neo uses it automatically. Use `--disable-xformers` (and so on) to switch one off again.
+Paths are container paths, so add a Path mapping in the template first.
 
-- **`--enable-insecure-extension-access`** (set by default): Allows installing/updating extensions from the WebUI. Risk: anyone who can log in can install an extension from any git URL, and its code runs inside the container on every start. Remove it for a safer posture and manage extensions on disk.
+| Flag | What it does |
+|---|---|
+| `--ckpt-dirs`, `--lora-dirs`, `--vae-dirs`, `--text-encoder-dirs` | Extra model folders (repeatable) |
+| `--embeddings-dir`, `--codeformer-models-path`, `--gfpgan-models-path`, `--esrgan-models-path` | Move one kind of model |
+| `--forge-ref-comfy-yaml` | Load model paths from a ComfyUI `extra_model_paths.yaml` |
+| `--styles-file`, `--localizations-dir` | Extra styles files, translations |
+| `--gradio-allowed-path` | Let the WebUI serve files from another folder |
+| `--freeze-settings-in-sections`, `--freeze-specific-settings` | Lock only some settings |
+| `--cors-allow-origins`, `--cors-allow-origins-regex` | Allow other websites to call the API |
+| `--timeout-keep-alive`, `--no-gradio-queue` | Connection tuning |
+| `--gradio-debug`, `--log-startup`, `--ui-debug-mode` | Debugging |
+| `--use-textbox-seed`, `--disable-console-progressbars`, `--no-prompt-history`, `--adv-samplers` | UI and log behavior |
+| `--unix-filenames-sanitization`, `--filenames-max-length` | Output file names |
+| `--deterministic`, `--force-upcast-attention`, `--use-pytorch-cross-attention`, `--force-xformers-vae`, `--sage-function` | Attention and reproducibility tuning |
+| `--mmap-torch-files`, `--disable-mmap`, `--disable-gpu-warning` | Model loading |
+| `--gpu-device-id`, `--device-id`, `--text-enc-device`, `--vae-device` | Device selection inside the container (to choose which GPUs the container gets, use `NVIDIA_VISIBLE_DEVICES`) |
+| `--skip-torch-cuda-test`, `--skip-version-check`, `--skip-prepare-environment`, `--skip-install` | Troubleshooting startup |
 
-- **`--api`** (not set by default): Enables the REST API. Only add this when you explicitly need programmatic access.
-
-If you change these arguments, keep in mind that some flags can weaken the container's security posture. Be especially careful with anything that increases network exposure.
+Full descriptions: `python launch.py --help` in Forge Neo, or its [README](https://github.com/Haoming02/sd-webui-forge-classic/tree/neo#commandline).
 
 </details>
 
@@ -579,6 +663,10 @@ This image uses Unraid-friendly defaults:
 
 Make sure your mapped host paths are writable by that UID/GID, or adjust the container settings to match your environment.
 
+**What startup changes, and what it doesn't:**
+- If the **Data Directory** (`/data`) or the appdata folder (`/config`) is owned by another user (for example root, after Unraid creates a new folder), startup changes their owner to `99:100`, so the WebUI can write to them.
+- **Folders you map in separately are never re-owned**, even when they sit inside `/data` (the optional Models and Outputs directories, or any extra path you add). Another app may use them. If the WebUI can't write to one, the log prints a warning and the fix (`chown -R nobody:users <that folder>` on the server, or set `APP_UID`/`APP_GID` to match the folder's owner).
+
 > [!TIP]
 > **More detail below:** click **File permissions and umask** to expand it.
 
@@ -599,16 +687,25 @@ This results in files with permissions like `rw-r-----` and directories with `rw
 
 ## Security Hardening Defaults
 
-This container uses the following security options by default (set in the Unraid template Extra Parameters):
+The Unraid template's **Extra Parameters** field (advanced view) holds the GPU flag and the security options. Unraid shows no explanation for that field, so here is each flag:
 
-```bash
---read-only
---tmpfs /tmp:rw,noexec,nosuid,nodev,size=2g
---security-opt no-new-privileges:true
---cap-drop=ALL
---cap-add=CHOWN --cap-add=FOWNER --cap-add=SETUID --cap-add=SETGID
---pids-limit=2048
 ```
+--runtime=nvidia --read-only --tmpfs /tmp:rw,noexec,nosuid,nodev,size=2g --security-opt no-new-privileges:true --cap-drop=ALL --cap-add=CHOWN --cap-add=FOWNER --cap-add=SETUID --cap-add=SETGID --pids-limit=2048
+```
+
+| Flag | What it does, in plain English | If you remove it |
+|---|---|---|
+| `--runtime=nvidia` | Gives the container your NVIDIA GPU, through Unraid's NVIDIA driver plugin. Which GPUs is set by `NVIDIA_VISIBLE_DEVICES` | **The WebUI has no GPU** and fails to start. Don't remove it |
+| `--read-only` | Makes the container's own files unchangeable. Only `/data`, `/config` and `/tmp` can be written. Like a locked-down kiosk image | Anything that gets in (a bad extension, an exploit) could modify the program files and stay hidden there |
+| `--tmpfs /tmp:rw,noexec,nosuid,nodev,size=2g` | A 2 GB scratch area in RAM for temporary files. `noexec`: programs can't be run from it. `nosuid`, `nodev`: no privilege tricks through it. Cleared on every restart | With `--read-only`, programs that need `/tmp` fail. Without the options, `/tmp` becomes an easier place to drop and run tools |
+| `--security-opt no-new-privileges:true` | Once a process starts, it can never gain more rights than it started with (no `sudo`-style escalation) | A compromised process has one more way to climb to root inside the container |
+| `--cap-drop=ALL` | Removes every special Linux power (*capability*) root normally has inside a container. Think of it as stripping root down to an ordinary account | Root inside the container keeps powers it doesn't need, such as changing network settings |
+| `--cap-add=CHOWN` | Gives back one power: changing file owners. Startup uses it to fix the owner of `/data` and `/config` | The ownership repair fails; you fix ownership by hand |
+| `--cap-add=FOWNER` | Lets startup fix permissions on files it doesn't own | Same as above, for permission fixes |
+| `--cap-add=SETUID`, `--cap-add=SETGID` | Lets startup switch from root to the WebUI user (`99:100`) | **The container can't drop root and refuses to start** |
+| `--pids-limit=2048` | At most 2048 processes and threads. Stops a runaway or malicious process from exhausting the server | A fork bomb or a buggy extension could slow down or freeze all of Unraid |
+
+All of these are standard Docker options. Removing a security flag works, but lowers your protection, so remove one only to troubleshoot, and put it back.
 
 - The container will refuse to start as root (UID 0) for safety.
 - All SUID/SGID bits are removed from binaries at build time.
@@ -620,28 +717,7 @@ This container uses the following security options by default (set in the Unraid
 
 For the full security baseline regression checklist, see `SECURITY.md`. To run the automated checks: `./scripts/security-check.sh`
 
-> [!TIP]
-> **More detail below:** click **What each security flag does** to expand it.
-
-<details>
-<summary><b>🔽 Click to expand: What each security flag does</b></summary>
-
-- **`--read-only`**: Reduces write access to the container filesystem, limiting persistence for attackers.
-- **`--tmpfs /tmp:...`**: Provides a safe, writable /tmp for runtime needs.
-- **`no-new-privileges:true`**: Prevents processes from gaining new privileges, reducing escalation risk.
-- **`--cap-drop=ALL` + targeted `--cap-add`**: Keeps a least-privilege capability profile while preserving required startup operations:
-	- `CHOWN`: required when `/data` ownership must be repaired
-	- `FOWNER`: required to fix mode bits on host-mounted paths not owned by uid 0
-	- `SETUID` / `SETGID`: required to drop from root to uid 99/gid 100 before launching WebUI
-- **`--pids-limit=2048`**: Contains runaway process spawning without being overly restrictive.
-
-To change the PID limit in Unraid:
-
-1. Open the container in Unraid and switch to advanced view.
-2. In Extra Parameters, change the `--pids-limit=<value>`.
-3. Apply the update.
-
-</details>
+**To change the PID limit:** open the container in Unraid, switch to advanced view, change `--pids-limit=<value>` in Extra Parameters, and apply.
 
 ### Docker Healthcheck
 
@@ -693,7 +769,7 @@ The container automatically restarts the WebUI process if it exits, so you do no
 - Check the container logs. The container prints a pre-launch summary and annotates known harmless warnings inline, so look past those to find real errors.
 - Confirm the port mapping is correct (Bridge mode) or that you are using the right IP (custom network mode).
 - Confirm the container is still running.
-- If the log mentions an unrecognized argument, remove that flag from `COMMANDLINE_ARGS`. Forge Neo stops on unknown flags.
+- If the log mentions an unrecognized argument, remove that flag from **Extra Launch Flags** (`COMMANDLINE_ARGS`). Forge Neo stops on unknown flags.
 
 ### The WebUI loads but cannot generate
 - You probably have no model yet. See [Getting Your First Model](#getting-your-first-model).
@@ -703,7 +779,7 @@ The container automatically restarts the WebUI process if it exits, so you do no
 - Confirm the container still has `--runtime=nvidia` in Extra Parameters.
 - Confirm Unraid is providing GPU access to the container.
 - Confirm the host NVIDIA driver/plugin is working.
-- If the WebUI fails with a message like `PyTorch is not able to access any compute device (GPU)`, you can temporarily add `--skip-torch-cuda-test` to `COMMANDLINE_ARGS` for troubleshooting. I do not recommend making that your long-term default, because it can hide a real GPU passthrough problem.
+- If the WebUI fails with a message like `PyTorch is not able to access any compute device (GPU)`, you can temporarily add `--skip-torch-cuda-test` to **Extra Launch Flags** (`COMMANDLINE_ARGS`) for troubleshooting. I do not recommend making that your long-term default, because it can hide a real GPU passthrough problem.
 - If the startup sanity check reports a torch version mismatch, an extension replaced PyTorch. Delete `<data-path>/python-user` and restart.
 
 ### I am seeing permission errors
@@ -734,8 +810,8 @@ If you delete the host data directory (`<data-path>`), Docker may recreate it ow
 [entrypoint] Repaired 42 files under /data. Continuing startup.
 ```
 
-> [!WARNING]
-> **Known issue:** the auto-fix re-owns **everything** under `/data`, including any other share you map inside it (for example a separate models share mapped to `/data/models`). If another app also uses that share and runs as a different user, it may lose write access. Until this is fixed, don't map shares that other containers use inside `/data`, or set `APP_UID`/`APP_GID` to the owner those files already have.
+> [!NOTE]
+> The auto-fix stops at folders you map in separately (for example the optional Models or Outputs directory). It never re-owns those; it warns instead. Earlier builds did re-own them; that was fixed on 2026-10-29.
 
 **If the auto-fix fails** (NFS shares with root squash, unusual SELinux policies, or other host-side restrictions), correct ownership manually on the Unraid host and restart:
 
@@ -749,13 +825,16 @@ chmod 775 <data-path>
 - Normal heavy operations (model loading, extension installs, image browser scanning) do **not** cause false positives.
 - Unhealthy status is informational only. Docker/Unraid will **not** auto-restart the container.
 - If you see unhealthy status, check the container logs for crash output.
-- If you changed the port in `COMMANDLINE_ARGS`, the healthcheck still probes 7860. Either keep the default port or rebuild the image with a matching `HEALTHCHECK`.
+- The WebUI always listens on 7860 inside the container (`--port` in Extra Launch Flags is removed), so the healthcheck always matches. To use another port on your server, change **WebUI** in the template.
 
 ## Environment Variables Reference
 
 | Variable | Default | Description |
 |---|---|---|
-| `COMMANDLINE_ARGS` | `--listen --port 7860 --data-dir /data --enable-insecure-extension-access` | Arguments passed directly to the WebUI launch command |
+| `COMMANDLINE_ARGS` | *(empty)* | **Extra Launch Flags**: added after the launch options. See [`COMMANDLINE_ARGS`](#commandline_args) |
+| `NEO_*` | see table | The launch options. See [Launch options](#launch-options) |
+| `NVIDIA_VISIBLE_DEVICES` | `all` | Which GPUs the container gets: `all`, or one GPU's UUID (shown by the Unraid NVIDIA driver plugin, or `nvidia-smi -L`) |
+| `NVIDIA_DRIVER_CAPABILITIES` | `compute,utility` | Which driver features the container gets. `compute` runs PyTorch; `utility` gives `nvidia-smi` |
 | `WEBUI_AUTH_FILE` | `/config/auth/webui-auth.txt` | Path to the managed authentication credentials file |
 | `API_AUTH_FILE_MODE` | `disabled` | Set to `mirror-webui-file` to copy WebUI creds to `--api-auth` when `--api` is enabled |
 | `RESTART_ON_EXIT` | `1` | `1` = restart WebUI after any exit; `0` = exit container on WebUI stop |
@@ -768,7 +847,7 @@ chmod 775 <data-path>
 | `WEBUI_LOGIN_LOCKOUT_MINUTES` | `15` | How long a lockout lasts (also the window failures are counted in) |
 | `PYTHONUSERBASE` | `/data/python-user` | Where packages installed by extensions go |
 | `WEBUI_HOST_IP` | *(unset)* | Address shown in the `[READY]` log banner, and added to the self-signed certificate. Set it to your Unraid IP in bridge mode, where the container can't see it. It does not change where the WebUI listens. |
-| `APP_UID` | `99` | User ID the WebUI runs as (Unraid's `nobody`). On first start, `/data` and `/config` are re-owned to this user. Must not be `0`. Values other than the default are not tested. |
+| `APP_UID` | `99` | User ID the WebUI runs as (Unraid's `nobody`). On first start, `/data` and `/config` are re-owned to this user (folders mapped in separately, such as an optional Models or Outputs directory, are not; see [Storage](#storage-and-permissions)). Must not be `0`. Values other than the default are not tested. |
 | `APP_GID` | `100` | Group ID the WebUI runs as (Unraid's `users`). Same rules as `APP_UID`. |
 | `UMASK` | *(unset)* | Override default umask for all file creation (e.g., `022`) |
 | `NO_COLOR` | *(unset)* | Set to `1` to suppress ANSI color codes in container logs |
@@ -784,7 +863,7 @@ This is a new project. The old AUTOMATIC1111 container ([aegisnir/A1111-unraid](
 - **Outputs:** Neo saves to `/data/output` (A1111 used `/data/outputs`). Your old images stay where they are. To keep using the old folder, set it in **Settings → Paths for Saving**.
 - **Old Python files:** `/data/venv` and `/data/repositories` are no longer used. The container leaves them alone. Delete them to free space.
 - **Extensions:** many A1111 extensions do not work on Neo. Check each one for a Neo version.
-- **Flags:** `--enable-insecure-extension-access` is now a default (the old container had extension installs off). `--xformers` is no longer a default (see [`COMMANDLINE_ARGS`](#commandline_args)). `--no-download-sd-model`, `--disable-safe-unpickle` and `--allow-code` are removed by Neo and dropped automatically.
+- **Flags:** `--enable-insecure-extension-access` is now a default (the old container had extension installs off). `--xformers` is no longer a default (see **Attention package** in [Launch options](#launch-options)). Launch flags are now [options](#launch-options); your old Extra Args value keeps working. `--no-download-sd-model`, `--disable-safe-unpickle` and `--allow-code` are removed by Neo and dropped automatically.
 
 ### Coming from another Forge Neo container
 
@@ -800,7 +879,7 @@ The WebUI normally blocks installing extensions from its Extensions tab when it 
 > [!WARNING]
 > With it on, **anyone who can log in can install an extension from any git URL, and that extension runs its own code inside the container** on every start. Protect your login: change the default password, keep the WebUI off the internet, and use HTTPS.
 
-**How to turn it off:** remove `--enable-insecure-extension-access` from `COMMANDLINE_ARGS` (the template's Extra Args). The Extensions tab then only shows what is installed.
+**How to turn it off:** set **Install extensions from the WebUI** (`NEO_EXTENSION_ACCESS`) to `false`. The Extensions tab then only shows what is installed.
 
 **Installing without the WebUI:** clone an extension into `<data-path>/extensions/` from the Unraid terminal, then restart the container. This works with the flag on or off.
 

@@ -101,10 +101,9 @@
   registry cache: the second build after it should reuse the PyTorch layer.
 - Optional: split the PyTorch layer into several smaller layers (needs a fixed Python install path),
   so a dropped download only retries one piece.
-- Proposed: a separate "Extra Launch Flags" template field appended to the required
-  `COMMANDLINE_ARGS`, so users can't delete `--listen --port --data-dir` by accident.
-- Fix the `/data` ownership repair so it no longer re-owns shares mapped inside `/data`
-  (warn instead). Documented as a known issue in the README.
+- Test the launch options on Aether: re-download the template and re-create the container from
+  it (Unraid doesn't add new template fields to an existing container); check the log for the
+  removed-flag notes and that CUDA malloc is on.
 - After the first build works: switch the base image to plain `ubuntu:24.04` (digest-pinned).
   Ubuntu 22.04 standard support ends April 2027, and the `nvidia/cuda` base duplicates the CUDA
   libraries the torch wheels already install. Set `NVIDIA_VISIBLE_DEVICES` and
