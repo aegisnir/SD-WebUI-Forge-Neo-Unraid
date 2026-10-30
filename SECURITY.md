@@ -115,7 +115,7 @@ grep -n 'umask 077' start.sh
 - [ ] PASS if images are only published under `:dev`, `:latest` or `:vX.Y.Z` after the Trivy image scan in `.github/workflows/build-image.yml` passes (the scan step must use `exit-code: "1"`).
 - [ ] PASS if image builds authenticate with the workflow's `GITHUB_TOKEN`, not a personal access token.
 - [ ] PASS if every `.trivyignore` vulnerability entry has a reason comment and an `exp:` date, and is listed in the README "Known security issues" section.
-- [ ] PASS if the nightly check (`check-updates.yml`) can only write `package_versions.txt` (its commit step stages that one file) and publishes only through `build-image.yml`, so the Trivy gate still applies.
+- [ ] PASS if the nightly check (`check-updates.yml`) can only write its channel's `package_versions.*.txt` on `dev` (its commit step stages that one file and pushes only to `dev`), and publishes only through `build-image.yml`, so the Trivy gate still applies. `build-image.yml` accepts only `dev` or `main` as a branch input.
 - [ ] PASS if the build cache is written only by `build-image.yml` runs on `dev`, `main` or release tags (never by pull requests).
 
 ### Extensions

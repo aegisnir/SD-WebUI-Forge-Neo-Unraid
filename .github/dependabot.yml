@@ -6,6 +6,8 @@ updates:
   # and any other actions added in .github/workflows/.
   - package-ecosystem: "github-actions"
     directory: "/"
+    # PRs go to dev (the testing branch), not the default branch (main).
+    target-branch: "dev"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
@@ -15,6 +17,8 @@ updates:
   # the pinned digest in the Dockerfile when Dependabot opens a PR.
   - package-ecosystem: "docker"
     directory: "/"
+    # PRs go to dev (the testing branch), not the default branch (main).
+    target-branch: "dev"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 3

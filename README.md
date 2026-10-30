@@ -1025,14 +1025,14 @@ For local builds, change the repository to `sd-webui-forge-neo-unraid:local`. Wh
 
 Updates only appear in Unraid when something in the image actually changed. This follows the method [linuxserver.io](https://www.linuxserver.io/) uses.
 
-- **Every night at 4 AM Eastern** a GitHub workflow rebuilds the image with today's Ubuntu security updates (and, once a month, fresh Python packages), then lists every package inside it. It compares that list with [`package_versions.txt`](package_versions.txt) in this repository.
-- **If the list changed**, it saves the new list (so the commit shows exactly which packages changed), then builds, scans and publishes `:dev` as usual.
+- **Every night at 4 AM Eastern** a GitHub workflow rebuilds each channel (`dev` for `:dev`, `main` for `:latest`) with today's Ubuntu security updates (and, once a month, fresh Python packages), then lists every package inside it. It compares that list with the channel's file on the `dev` branch: [`package_versions.dev.txt`](https://github.com/aegisnir/sd-webui-forge-neo-unraid/blob/dev/package_versions.dev.txt) or [`package_versions.latest.txt`](https://github.com/aegisnir/sd-webui-forge-neo-unraid/blob/dev/package_versions.latest.txt).
+- **If a channel's list changed**, it saves the new list (so the commit shows exactly which packages changed), then builds, scans and publishes that channel's tag as usual. Each channel is checked and published on its own.
 - **If nothing changed**, nothing is published, and Unraid shows no update.
 - Code changes and new Forge Neo releases are published when they are merged, as before.
 
 **Downloads stay small.** Builds reuse unchanged layers from a build cache (a `:buildcache` tag in the same package; you never pull it). Docker on your server only reuses a layer when every layer *under* it is unchanged too, so the image is stacked from least to most often changing: the CUDA base, then Python and PyTorch (about 3.8 GB, split into 10 layers of roughly 400 MB), then Forge Neo, then the Ubuntu security updates (about 300 MB), then this project's scripts. An Ubuntu security update therefore downloads only the top layers, not the PyTorch layers. The split exists because one 3.8 GB download is fragile on a slow or unstable connection: a dropped connection retries one ~400 MB piece instead of the whole thing, and Docker downloads several pieces at once. The big layer is downloaded again when PyTorch or a pinned package version changes, and at most about once a month otherwise, because the monthly Python refresh rebuilds that layer even when no package changed (the first update published after the 1st of a month carries it).
 
-**One GitHub quirk:** GitHub turns off scheduled workflows after 60 days without repository activity. The nightly check therefore commits a small "checked" update to `package_versions.txt` once a month even when nothing changed.
+**One GitHub quirk:** GitHub turns off scheduled workflows after 60 days without repository activity. The nightly check therefore commits a small "checked" update to each package list once a month even when nothing changed.
 
 ### Maintenance
 
