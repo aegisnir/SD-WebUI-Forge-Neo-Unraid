@@ -118,6 +118,13 @@ TAKES_VALUE = {
     "--cuda-stream": "?", "--theme": 1, "--tiled-conv2d": 1, "--reserve-vram": 1,
     "--model-ref": 1, "--forge-ref-comfy-home": 1, "--forge-ref-a1111-home": 1,
     "--subpath": 1, "--loglevel": 1,
+    # Dropped flags that took a value ("+" = one or more).
+    "--ckpt": 1, "--config": 1, "--precision": 1, "--models-dir": 1, "--hypernetwork-dir": 1,
+    "--textual-inversion-templates-dir": 1, "--gfpgan-dir": 1, "--gfpgan-model": 1,
+    "--bsrgan-models-path": 1, "--realesrgan-models-path": 1, "--dat-models-path": 1,
+    "--clip-models-path": 1, "--lyco-dir-backcompat": 1, "--max-batch-count": 1,
+    "--sub-quad-q-chunk-size": 1, "--sub-quad-kv-chunk-size": 1, "--sub-quad-chunk-threshold": 1,
+    "--use-cpu": "+",
 }
 
 MANAGED = {
@@ -145,9 +152,102 @@ NOT_ALLOWED = {
     "--cpu": "this image is for NVIDIA GPUs",
     "--add-stop-route": "Neo says it does nothing",
     "--administrator": "undocumented; not supported here",
-    "--no-download-sd-model": "not in Forge Neo (it never downloads a model on its own)",
-    "--disable-safe-unpickle": "not in Forge Neo (it always loads checkpoints safely)",
-    "--allow-code": "not in Forge Neo",
+}
+
+# Flags from AUTOMATIC1111 (v1.10.1) and the original Forge that Forge Neo
+# dropped. Neo exits on any flag it doesn't know, so these are removed with a
+# note on what replaced them. README "Coming from A1111 or Forge" has the
+# same list in plain English.
+_ATTENTION = "Forge Neo picks the attention method on its own (PyTorch's built-in one unless a package is installed)"
+_VRAM = "Forge Neo manages VRAM on its own; use the VRAM mode option only if you run out of memory"
+_NOOP = "it already did nothing in A1111"
+DROPPED = {
+    # A1111: attention
+    "--opt-sdp-attention": _ATTENTION,
+    "--opt-sdp-no-mem-attention": _ATTENTION,
+    "--opt-split-attention": _ATTENTION,
+    "--opt-split-attention-v1": _ATTENTION,
+    "--opt-split-attention-invokeai": _ATTENTION,
+    "--opt-sub-quad-attention": _ATTENTION,
+    "--sub-quad-q-chunk-size": _ATTENTION,
+    "--sub-quad-kv-chunk-size": _ATTENTION,
+    "--sub-quad-chunk-threshold": _ATTENTION,
+    "--disable-opt-split-attention": _ATTENTION,
+    "--force-enable-xformers": "use the Attention package option (xformers)",
+    "--xformers-flash-attention": "use the Attention package option (xformers or flash)",
+    "--opt-channelslast": "no replacement",
+    # A1111: memory and precision
+    "--medvram": _VRAM,
+    "--medvram-sdxl": _VRAM,
+    "--lowram": _VRAM,
+    "--no-half": "use the Precision option (fp32)",
+    "--precision": "use the Precision option (fp32)",
+    "--no-half-vae": "Neo already runs the VAE in bf16, which avoids black images; use VAE precision (fp32) if you still get them",
+    "--upcast-sampling": "Neo handles this on its own",
+    "--disable-nan-check": "no replacement",
+    "--use-cpu": "this image is for NVIDIA GPUs; use VAE on CPU or Text encoder on CPU",
+    "--use-ipex": "this image is for NVIDIA GPUs",
+    # A1111: models and folders
+    "--ckpt": "put the checkpoint in models/Stable-diffusion (Neo would read this flag as a checkpoint folder)",
+    "--config": "Neo detects the model type on its own",
+    "--models-dir": "use the Data Directory or Models Directory path in the template",
+    "--hypernetwork-dir": "Forge Neo doesn't support hypernetworks",
+    "--textual-inversion-templates-dir": "Forge Neo has no training tab",
+    "--gfpgan-dir": "use --gfpgan-models-path",
+    "--gfpgan-model": "use --gfpgan-models-path",
+    "--bsrgan-models-path": "upscalers go in models/ESRGAN (--esrgan-models-path)",
+    "--realesrgan-models-path": "upscalers go in models/ESRGAN (--esrgan-models-path)",
+    "--dat-models-path": "upscalers go in models/ESRGAN (--esrgan-models-path)",
+    "--lyco-dir-backcompat": "LyCORIS files go in models/Lora",
+    "--clip-models-path": "Forge Neo has no CLIP interrogator",
+    "--do-not-download-clip": "no replacement",
+    "--no-download-sd-model": "Neo never downloads a model on its own",
+    "--disable-safe-unpickle": "Neo always loads checkpoints safely",
+    "--allow-code": "no replacement",
+    "--skip-load-model-at-start": "no replacement",
+    "--disable-model-loading-ram-optimization": "no replacement",
+    # A1111: UI and launcher
+    "--no-progressbar-hiding": "no replacement",
+    "--test-server": "no replacement",
+    "--update-check": "the image is updated as a whole; Unraid shows new versions",
+    "--always-batch-cond-uncond": _NOOP,
+    "--deepdanbooru": _NOOP,
+    "--enable-console-prompts": _NOOP,
+    "--gradio-img2img-tool": _NOOP,
+    "--gradio-inpaint-tool": _NOOP,
+    "--gradio-queue": _NOOP,
+    "--max-batch-count": _NOOP,
+    "--show-negative-prompt": _NOOP,
+    "--unload-gfpgan": _NOOP,
+    # Original Forge (lllyasviel): renamed in Neo
+    "--always-gpu": "use the VRAM mode option (gpu-only)",
+    "--always-high-vram": "use the VRAM mode option (highvram)",
+    "--always-normal-vram": "VRAM mode normal is the default",
+    "--always-low-vram": "use the VRAM mode option (lowvram)",
+    "--always-no-vram": "use the VRAM mode option (novram)",
+    "--always-offload-from-vram": "closest is the Disable smart memory option",
+    "--always-cpu": "this image is for NVIDIA GPUs",
+    "--all-in-fp16": "use the Precision option (fp16)",
+    "--all-in-fp32": "use the Precision option (fp32)",
+    "--unet-in-bf16": "use the Diffusion model precision option",
+    "--unet-in-fp16": "use the Diffusion model precision option",
+    "--unet-in-fp8-e4m3fn": "use the Diffusion model precision option",
+    "--unet-in-fp8-e5m2": "use the Diffusion model precision option",
+    "--vae-in-bf16": "use the VAE precision option",
+    "--vae-in-fp16": "use the VAE precision option",
+    "--vae-in-fp32": "use the VAE precision option",
+    "--vae-in-cpu": "use the VAE on CPU option",
+    "--clip-in-fp16": "use the Text encoder precision option",
+    "--clip-in-fp32": "use the Text encoder precision option",
+    "--clip-in-fp8-e4m3fn": "use the Text encoder precision option",
+    "--clip-in-fp8-e5m2": "use the Text encoder precision option",
+    "--attention-pytorch": _ATTENTION,
+    "--attention-split": _ATTENTION,
+    "--attention-quad": _ATTENTION,
+    "--disable-attention-upcast": "no replacement (Neo's --force-upcast-attention does the opposite)",
+    "--pytorch-deterministic": "use --deterministic",
+    "--disable-ipex-hijack": "this image is for NVIDIA GPUs",
+    "--skip-google-blockly": "no replacement",
 }
 
 
@@ -235,13 +335,18 @@ def build(environ, warn):
         name, eq, _ = token.partition("=")
         span = 1
         if not eq and name in TAKES_VALUE and i + 1 < len(extra) and not extra[i + 1].startswith("--"):
-            if TAKES_VALUE[name] == 1 or re.fullmatch(r"-?\d+", extra[i + 1]):
+            if TAKES_VALUE[name] == "+":
+                while i + span < len(extra) and not extra[i + span].startswith("--"):
+                    span += 1
+            elif TAKES_VALUE[name] == 1 or re.fullmatch(r"-?\d+", extra[i + 1]):
                 span = 2
         removed = " ".join(extra[i:i + span])
         if name in MANAGED:
             warn(f"Removed {removed!r} from Extra Launch Flags: {MANAGED[name]}.")
         elif name in NOT_ALLOWED:
             warn(f"Removed {removed!r} from Extra Launch Flags: {NOT_ALLOWED[name]}.")
+        elif name in DROPPED:
+            warn(f"Removed {removed!r} from Extra Launch Flags: an A1111/Forge flag that Forge Neo dropped; {DROPPED[name]}.")
         elif name in owned:
             env, label = owned[name]
             warn(f"Removed {removed!r} from Extra Launch Flags: use the template option {label!r} ({env}) instead.")

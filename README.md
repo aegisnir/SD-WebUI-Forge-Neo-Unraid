@@ -71,6 +71,8 @@ I built this container for my own Unraid server and the way I use it, then share
 - [Security Hardening](#security-hardening-defaults)
 - [Operational Notes](#operational-notes)
 - [Troubleshooting](#troubleshooting)
+- [Migration Notes](#migration-notes)
+  - [A1111, Forge and Forge Neo: what changed](#a1111-forge-and-forge-neo-what-changed)
 - [Advanced Topics](#advanced-topics)
 - [Quick Reference](#quick-reference)
 - [Licensing and Third-Party Notices](#licensing-and-third-party-notices)
@@ -577,7 +579,8 @@ This is the template's **Extra Launch Flags** field: anything not covered by the
 
 - **The options always win.** If a flag here is also controlled by an option (for example `--api` or `--cuda-malloc`), it is removed, and the log names the option to use instead. That way there is one place to change each setting.
 - **Flags the container manages are removed** with a log message: `--listen`, `--port`, `--data-dir`, `--ui-config-file`, `--ui-settings-file`, `--reinstall-torch`, `--reinstall-xformers`, `--uv`, `--uv-symlink`, `--uv-local-cache`, `--dump-sysinfo`.
-- **Flags not allowed in this container are removed** with a reason: `--share`, `--ngrok`, `--ngrok-options`, `--ngrok-region` (public internet tunnels; use a reverse proxy or a Cloudflare Tunnel instead), `--autolaunch` (no browser in a container), `--server-name` (conflicts with `--listen`), `--directml`, `--cpu` (this image is for NVIDIA GPUs), `--add-stop-route`, `--administrator` (no effect or undocumented). Old A1111 flags Neo doesn't have (`--no-download-sd-model`, `--disable-safe-unpickle`, `--allow-code`) are removed too.
+- **Flags not allowed in this container are removed** with a reason: `--share`, `--ngrok`, `--ngrok-options`, `--ngrok-region` (public internet tunnels; use a reverse proxy or a Cloudflare Tunnel instead), `--autolaunch` (no browser in a container), `--server-name` (conflicts with `--listen`), `--directml`, `--cpu` (this image is for NVIDIA GPUs), `--add-stop-route`, `--administrator` (no effect or undocumented).
+- **Old AUTOMATIC1111 and Forge flags that Forge Neo dropped are removed** (for example `--opt-sdp-attention`, `--xformers-flash-attention`, `--medvram`, `--no-half-vae`), with a log line saying what replaced each one. Full list: [A1111, Forge and Forge Neo: what changed](#a1111-forge-and-forge-neo-what-changed).
 - **Your own HTTPS and login flags are respected:** `--tls-keyfile`/`--tls-certfile` and `--gradio-auth`/`--gradio-auth-path`/`--api-auth` switch off the container's own handling of those, as described in their sections.
 - Forge Neo stops at startup on any other flag it doesn't know, so check spelling.
 
@@ -858,6 +861,78 @@ chmod 775 <data-path>
 
 ## Migration Notes
 
+### A1111, Forge and Forge Neo: what changed
+
+Three WebUIs share one family tree, and most guides online were written for the first two:
+
+| WebUI | Who | What it is |
+|---|---|---|
+| **AUTOMATIC1111** (A1111) | AUTOMATIC1111 | The original Stable Diffusion WebUI. Stopped receiving updates in March 2026. |
+| **Forge** | lllyasviel | A1111's interface on a rewritten model engine: faster, less VRAM, memory managed automatically. |
+| **Forge Neo** | Haoming02 | Continues Forge: newer models (Flux, Qwen, Wan and more), Python 3.13, current PyTorch. Removed many old A1111 features and flags. This container runs Forge Neo. |
+
+So a guide that says "add `--xformers --opt-sdp-attention --medvram`" is written for A1111 and doesn't apply here. Forge Neo **stops at startup on any flag it doesn't know**, so this container removes the dropped flags from **Extra Launch Flags** and logs what to use instead.
+
+**What you no longer need to set:**
+
+- **Attention (`--xformers`, `--opt-sdp-attention` and the other `--opt-*` flags).** *Attention* is the step that links your prompt to the image, and the slowest part of generation. A1111 made you pick a method with a flag. Forge Neo picks one on its own, in this order: SageAttention, FlashAttention, xformers, then PyTorch's built-in attention. Nothing extra is installed in this image, so it uses PyTorch's built-in one, which is exactly what `--opt-sdp-attention` selected in A1111. Your log shows `Using PyTorch Cross Attention`. In Forge Neo, `--xformers` only **installs** the xformers package (it's the **Attention package** option here); Neo's own advice is that PyTorch's built-in attention "is usually as fast, and also more stable".
+- **Memory (`--medvram`, `--medvram-sdxl`, `--lowram`).** Forge and Neo move model parts in and out of VRAM on their own. If you still run out of memory, use the **VRAM mode** option (`lowvram`).
+- **Precision (`--no-half`, `--no-half-vae`, `--precision full`, `--upcast-sampling`).** Neo picks half precision where the GPU supports it and runs the VAE in bf16, which avoids the black images `--no-half-vae` used to fix. Use the **Precision** and **VAE precision** options only to force something.
+
+**Features Forge Neo removed:** hypernetworks, the Train tab, the CLIP and DeepBooru interrogators, and the old split/sub-quadratic attention methods. Hypernetwork files no longer load.
+
+**Folder flags that were renamed:** Neo uses plural names that can be given more than once: `--ckpt-dirs`, `--vae-dirs`, `--text-encoder-dirs`, `--lora-dirs`. The old singular names (`--ckpt-dir`, `--vae-dir`, `--text-encoder-dir`, `--lora-dir`) still work. A1111's `--ckpt` (one checkpoint file) does **not**: Neo would read it as a folder, so it is removed; put the file in `models/Stable-diffusion` instead.
+
+<details>
+<summary><strong>Every dropped flag and what replaced it</strong> (click to expand)</summary>
+
+**From AUTOMATIC1111:**
+
+| Flag | Instead |
+|---|---|
+| `--opt-sdp-attention`, `--opt-sdp-no-mem-attention`, `--opt-split-attention`, `--opt-split-attention-v1`, `--opt-split-attention-invokeai`, `--opt-sub-quad-attention`, `--sub-quad-q-chunk-size`, `--sub-quad-kv-chunk-size`, `--sub-quad-chunk-threshold`, `--disable-opt-split-attention` | Nothing. Neo picks attention on its own |
+| `--force-enable-xformers`, `--xformers-flash-attention` | **Attention package** option (xformers or flash) |
+| `--medvram`, `--medvram-sdxl`, `--lowram` | Nothing. **VRAM mode** only if you run out of memory |
+| `--no-half`, `--precision full` | **Precision** option (`fp32`) |
+| `--no-half-vae` | Nothing usually; **VAE precision** (`fp32`) if you still get black images |
+| `--upcast-sampling` | Nothing. Neo handles it |
+| `--use-cpu` | **VAE on CPU** / **Text encoder on CPU** options (this image is for NVIDIA GPUs) |
+| `--use-ipex` | Not supported (Intel GPUs) |
+| `--ckpt` | Put the file in `models/Stable-diffusion` |
+| `--config` | Nothing. Neo detects the model type |
+| `--models-dir` | **Data Directory** or **Models Directory** path in the template |
+| `--gfpgan-dir`, `--gfpgan-model` | `--gfpgan-models-path` |
+| `--bsrgan-models-path`, `--realesrgan-models-path`, `--dat-models-path` | All upscalers go in `models/ESRGAN` (`--esrgan-models-path`) |
+| `--lyco-dir-backcompat` | LyCORIS files go in `models/Lora` |
+| `--hypernetwork-dir`, `--textual-inversion-templates-dir`, `--clip-models-path`, `--do-not-download-clip` | Features removed (hypernetworks, training, interrogator) |
+| `--no-download-sd-model` | Nothing. Neo never downloads a model on its own |
+| `--disable-safe-unpickle` | Nothing. Neo always loads checkpoints safely |
+| `--allow-code`, `--opt-channelslast`, `--disable-nan-check`, `--skip-load-model-at-start`, `--disable-model-loading-ram-optimization`, `--no-progressbar-hiding`, `--test-server` | No replacement |
+| `--update-check` | The image is updated as a whole; Unraid shows new versions |
+| `--always-batch-cond-uncond`, `--deepdanbooru`, `--enable-console-prompts`, `--gradio-img2img-tool`, `--gradio-inpaint-tool`, `--gradio-queue`, `--max-batch-count`, `--show-negative-prompt`, `--unload-gfpgan` | Already did nothing in A1111 |
+
+**From the original Forge:**
+
+| Flag | Instead |
+|---|---|
+| `--always-gpu`, `--always-high-vram`, `--always-low-vram`, `--always-no-vram` | **VRAM mode** option (`gpu-only`, `highvram`, `lowvram`, `novram`) |
+| `--always-normal-vram` | Nothing. `normal` is the default |
+| `--always-offload-from-vram` | Closest: **Disable smart memory** option |
+| `--always-cpu`, `--disable-ipex-hijack` | Not supported (this image is for NVIDIA GPUs) |
+| `--all-in-fp16`, `--all-in-fp32` | **Precision** option |
+| `--unet-in-bf16`, `--unet-in-fp16`, `--unet-in-fp8-e4m3fn`, `--unet-in-fp8-e5m2` | **Diffusion model precision** option |
+| `--vae-in-bf16`, `--vae-in-fp16`, `--vae-in-fp32` | **VAE precision** option |
+| `--vae-in-cpu` | **VAE on CPU** option |
+| `--clip-in-fp16`, `--clip-in-fp32`, `--clip-in-fp8-e4m3fn`, `--clip-in-fp8-e5m2` | **Text encoder precision** option |
+| `--attention-pytorch`, `--attention-split`, `--attention-quad` | Nothing. Neo picks attention on its own |
+| `--disable-attention-upcast` | No replacement (`--force-upcast-attention` does the opposite) |
+| `--pytorch-deterministic` | `--deterministic` |
+| `--skip-google-blockly` | No replacement |
+
+Compared against AUTOMATIC1111 v1.10.1, Forge's `main` branch and Forge Neo 2.31.
+
+</details>
+
 ### Coming from the old A1111 image
 
 This is a new project. The old AUTOMATIC1111 container ([aegisnir/A1111-unraid](https://github.com/aegisnir/A1111-unraid)) and its image stay where they are, so existing installs keep working. To switch, add this template as a new container. Your models in `/data` work as they are.
@@ -866,7 +941,7 @@ This is a new project. The old AUTOMATIC1111 container ([aegisnir/A1111-unraid](
 - **Outputs:** Neo saves to `/data/output` (A1111 used `/data/outputs`). Your old images stay where they are. To keep using the old folder, set it in **Settings → Paths for Saving**.
 - **Old Python files:** `/data/venv` and `/data/repositories` are no longer used. The container leaves them alone. Delete them to free space.
 - **Extensions:** many A1111 extensions do not work on Neo. Check each one for a Neo version.
-- **Flags:** `--enable-insecure-extension-access` is now a default (the old container had extension installs off). `--xformers` is no longer a default (see **Attention package** in [Launch options](#launch-options)). Launch flags are now [options](#launch-options); your old Extra Args value keeps working. `--no-download-sd-model`, `--disable-safe-unpickle` and `--allow-code` are removed by Neo and dropped automatically.
+- **Flags:** `--enable-insecure-extension-access` is now a default (the old container had extension installs off). `--xformers` is no longer a default and no longer needed (see [what changed](#a1111-forge-and-forge-neo-what-changed)). Launch flags are now [options](#launch-options); your old Extra Args value keeps working. A1111 flags that Forge Neo dropped are removed automatically, with a log line for each.
 
 ### Coming from another Forge Neo container
 

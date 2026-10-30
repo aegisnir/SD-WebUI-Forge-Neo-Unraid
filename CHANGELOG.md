@@ -7,8 +7,13 @@ I am keeping this intentionally lightweight. This is a personal, AI-assisted hob
 
 ## [Unreleased]
 
+### Added
+
+- **Old AUTOMATIC1111 and Forge flags are removed from Extra Launch Flags** instead of stopping Forge Neo at startup. Neo exits on any flag it doesn't know, and guides written for A1111 still recommend flags like `--opt-sdp-attention`, `--xformers-flash-attention`, `--medvram` and `--no-half-vae`. 81 dropped flags (A1111 v1.10.1 and the original Forge, compared with Forge Neo 2.31) are now removed with a log line naming the replacement. This includes A1111's `--ckpt` and `--gfpgan-model`, which Neo would otherwise misread as shortened forms of its folder flags.
+
 ### Documentation
 
+- **New README section "A1111, Forge and Forge Neo: what changed":** how the three WebUIs relate, why attention, VRAM and precision flags are no longer needed (Neo picks them on its own), features Neo removed, renamed folder flags, and a table of every dropped flag with its replacement.
 - **CUDA malloc warning** (template and README) now notes that Forge Neo's Torch Compile presets `max-autotune` and `reduce-overhead` do not work while it is on.
 
 ### Fixed (first test on the maintainer's server, 2026-10-29)
