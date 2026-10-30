@@ -16,7 +16,7 @@
 [![Badge showing Continuous Integration workflow status passing, clickable to view CI actions page](https://github.com/aegisnir/sd-webui-forge-neo-unraid/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/aegisnir/sd-webui-forge-neo-unraid/actions/workflows/ci.yml)
 [![Light blue badge indicating security hardening with best practices implemented, clickable to view security details](https://img.shields.io/badge/security-hardened-informational)](SECURITY.md)
 
-Forge Neo is Haoming02's work, a maintained fork of the Stable Diffusion WebUI. This repository does not change the WebUI. It only packages it as a hardened Unraid container with NVIDIA GPU support in mind. Bugs in the WebUI itself belong [upstream](https://github.com/Haoming02/sd-webui-forge-classic/issues). The goal is to keep it practical, easy to use, and security-conscious.
+Forge Neo is Haoming02's work, a maintained fork of the Stable Diffusion WebUI. This repository does not change the WebUI. It only packages it as a hardened Unraid container with NVIDIA GPU support in mind. Bugs in the WebUI itself belong [upstream](https://github.com/Haoming02/sd-webui-forge-classic/issues). Problems with the container go in the [Unraid forum support thread](https://forums.unraid.net/topic/201112-support-aegisnir-sd-webui-forge-neo-unraid/) or this repository's [issues](https://github.com/aegisnir/sd-webui-forge-neo-unraid/issues). The goal is to keep it practical, easy to use, and security-conscious.
 
 Forge Neo's own repository includes a basic [Docker setup](https://github.com/Haoming02/sd-webui-forge-classic/tree/neo/docker). This project is a separate, Unraid-focused packaging with its own hardening, HTTPS and login handling.
 
@@ -227,14 +227,14 @@ The included Unraid template sets `--runtime=nvidia` in Extra Parameters by defa
 ## Quick Start
 
 > [!NOTE]
-> This project is not yet in the Unraid Community Applications store. Use the manual template import steps below.
+> This app is listed in Unraid Community Applications. In Unraid, open **Apps**, search for **Forge Neo**, and install **SD-WebUI-Forge-Neo-Unraid**. Community Applications asks which tag you want: `latest` (stable, recommended) or `dev` (testing, may break). If it doesn't show up yet, use the manual template import in step 2.
 
 1. **Confirm your GPU works.** Run the [GPU sanity check](#gpu-sanity-check) above if you have not already.
 
-2. **Import the template into Unraid.** SSH into your Unraid host and run:
+2. **Install from Apps, or import the template by hand.** Community Applications is the easy way (see the note above). To import the template manually, SSH into your Unraid host and run:
    ```bash
-   wget -P /boot/config/plugins/dockerMan/templates-user/ \
-     https://raw.githubusercontent.com/aegisnir/sd-webui-forge-neo-unraid/dev/template.xml
+   wget -O /boot/config/plugins/dockerMan/templates-user/my-SD-WebUI-Forge-Neo-Unraid.xml \
+     https://raw.githubusercontent.com/aegisnir/unraid-templates/main/templates/sd-webui-forge-neo-unraid.xml
    ```
    Then go to the **Docker** tab → **Add Container** and select `SD-WebUI-Forge-Neo-Unraid` from the template list.
 
@@ -1013,13 +1013,16 @@ Unraid's "update available" check does not work for an image you built yourself;
 
 ### Image tags
 
-The included `template.xml` defaults to the published GHCR image:
+Two channels are published:
 
-- Repository: `ghcr.io/aegisnir/sd-webui-forge-neo-unraid:dev`
+- `ghcr.io/aegisnir/sd-webui-forge-neo-unraid:latest`: stable, built from the `main` branch. The Community Applications template uses it by default.
+- `ghcr.io/aegisnir/sd-webui-forge-neo-unraid:dev`: testing, built from the `dev` branch on every change. It may break. The `template.xml` in this repository uses it.
+
+To switch an installed container between them, edit the container and change the tag at the end of **Repository**.
 
 Images are built by GitHub Actions. Every build is pushed as `:sha-<commit>`, scanned with Trivy, and only then published under its channel tag (`:dev`, `:latest`, or `:vX.Y.Z`). The `:sha-` tags stay available as rollback points. A `:sha-` tag can be pulled before its scan finishes, and a build that fails the scan keeps its `:sha-` tag, so use the channel tags unless you are rolling back to a build you know passed.
 
-For local builds, change the repository to `sd-webui-forge-neo-unraid:local`. When a stable release is promoted, switch to `ghcr.io/aegisnir/sd-webui-forge-neo-unraid:latest`.
+For local builds, change the repository to `sd-webui-forge-neo-unraid:local`.
 
 ### How updates are published
 

@@ -29,11 +29,11 @@ If you choose to use something from this repo, I recommend reviewing changes for
 
 The current tagging strategy:
 
-- `:dev`: floating pre-release tag, always points to the latest commit on the `dev` branch. Use this if you want to track development.
+- `:latest`: stable tag, built from the `main` branch (the repository's default branch). Changes reach `main` only after they have run on `dev`. Recommended for most users.
+- `:dev`: testing tag, built from the `dev` branch on every change. Use this if you want new changes first and don't mind the occasional breakage.
 - `:vX.Y.Z` (e.g. `:v1.0.0`): pinned version tags for specific tested states. Use these if you want reproducibility.
-- `:latest`: stable release tag, promoted from `dev` only after real-world validation. Not yet published.
 
-`main` branch and `:latest` are frozen until `dev` proves stable.
+Both `:latest` and `:dev` are also rebuilt when the nightly check finds new Ubuntu or Python package updates for them.
 
 ---
 
