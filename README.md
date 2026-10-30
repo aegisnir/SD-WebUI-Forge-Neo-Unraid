@@ -421,7 +421,7 @@ This container enables the WebUI login page by default. The API is disabled by d
 **First login:**
 
 - Username: `admin`
-- Password: random, shown once in the container log on first launch, and saved in the auth file
+- Password: random and memorable (for example `rull9KRAH-loth`), shown once in the container log after the `[READY]` box, and saved in the auth file
 
 Change this as soon as possible after first login.
 

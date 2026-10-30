@@ -49,9 +49,9 @@ trap '_forward_signal' TERM INT
 # Set NO_COLOR=1 or TERM=dumb in the container environment to suppress them.
 if [[ "${NO_COLOR:-}" == "" && "${TERM:-}" != "dumb" ]]; then
   C_RESET=$'\e[0m'; C_BOLD=$'\e[1m'; C_ACCENT=$'\e[96m'
-  C_INFO=$'\e[95m'; C_WARN=$'\e[93m'; C_CRIT=$'\e[91m'
+  C_INFO=$'\e[95m'; C_WARN=$'\e[93m'; C_CRIT=$'\e[91m'; C_LOGIN=$'\e[92m'
 else
-  C_RESET='' C_BOLD='' C_ACCENT='' C_INFO='' C_WARN='' C_CRIT=''
+  C_RESET='' C_BOLD='' C_ACCENT='' C_INFO='' C_WARN='' C_CRIT='' C_LOGIN=''
 fi
 
 # Set HOME for the non-root user to /data for consistent config/cache locations
@@ -113,6 +113,8 @@ RESTART_MAX_ATTEMPTS="${RESTART_MAX_ATTEMPTS:-0}"  # 0 = retry indefinitely; N =
 WEBUI_AUTH_FILE_DEFAULT="/config/auth/webui-auth.txt"
 WEBUI_AUTH_FILE="${WEBUI_AUTH_FILE:-${WEBUI_AUTH_FILE_DEFAULT}}"
 WEBUI_AUTH_RUNTIME_FILE="/config/auth/.webui-auth.runtime.txt"
+FIRST_LAUNCH_PASSWORD=""                                           # Set only on the start that creates the auth file
+FIRST_LOGIN_SHOWN_MARKER="/tmp/.first-login-shown"                 # /tmp is cleared when the container restarts
 
 # mirror-webui-file = copy WebUI credentials to --api-auth when --api is enabled
 # disabled        = do not auto-set --api-auth; user manages it manually
@@ -413,13 +415,35 @@ write_runtime_auth_file() {
   _auth_file_tool --write "$1" "$2"
 }
 
+# generate_memorable_password: Prints a random password in the style of
+# 1Password's memorable generator, for example "rull9KRAH-loth": three made-up
+# words, one in capitals, split by one digit and one symbol. About 38 bits, which
+# suits an online-only login with lockout. The word parts avoid common swear
+# words, and the symbols avoid : and , which the auth file format reserves.
+generate_memorable_password() {
+  "${PYTHON_BIN}" - <<'PY'
+import secrets
+
+onsets = "bdfghjklmnprstvwz"
+vowels = "aeiou"
+codas = "ll rr nn th sh nd st rn lt lm rk rm".split()
+words = [secrets.choice(onsets) + secrets.choice(vowels) + secrets.choice(codas) for _ in range(3)]
+capital = secrets.randbelow(3)
+words[capital] = words[capital].upper()
+separators = [secrets.choice("0123456789"), secrets.choice("-_.+@")]
+if secrets.randbelow(2):
+    separators.reverse()
+print(f"{words[0]}{separators[0]}{words[1]}{separators[1]}{words[2]}")
+PY
+}
+
 # seed_auth_file: First launch only. Creates the auth file with a random admin
-# password and shows it once in the log. Stops startup if no password can be
-# generated: there is deliberately no fallback to a default password.
+# password. Stops startup if no password can be generated: there is deliberately
+# no fallback to a default password. The login is shown after the [READY] box.
 seed_auth_file() {
-  local password line
-  password="$(openssl rand -hex 16 2>/dev/null)" || password=""
-  if [[ ! "${password}" =~ ^[0-9a-f]{32}$ ]]; then
+  local password password_format='^[A-Za-z]{4}[0-9._+@-][A-Za-z]{4}[0-9._+@-][A-Za-z]{4}$'
+  password="$(generate_memorable_password 2>/dev/null)" || password=""
+  if [[ ! "${password}" =~ ${password_format} ]]; then
     echo "${C_CRIT}${C_BOLD}CRITICAL:${C_RESET}${C_CRIT} Could not generate a random WebUI password. Refusing to start without a login.${C_RESET}" >&2
     exit 1
   fi
@@ -433,21 +457,27 @@ seed_auth_file() {
     mv -f "${WEBUI_AUTH_FILE}.tmp.$$" "${WEBUI_AUTH_FILE}"
   )
 
-  echo "" >&2
-  echo "${C_WARN}╭──────────────────────────────────────────────────────────────╮${C_RESET}" >&2
-  for line in \
-    "FIRST LAUNCH LOGIN: shown this one time" \
-    "" \
-    "  Username: admin" \
-    "  Password: ${password}" \
-    "" \
-    "Change this password, and do not post this log publicly" \
-    "until you have. Saved in the auth file:" \
-    "  ${WEBUI_AUTH_FILE}"; do
-    printf '%s│  %-60s│%s\n' "${C_WARN}" "${line}" "${C_RESET}" >&2
+  FIRST_LAUNCH_PASSWORD="${password}"
+  echo "${C_WARN}First-launch login created. It appears after the [READY] box, and is saved in ${WEBUI_AUTH_FILE}.${C_RESET}" >&2
+}
+
+# print_first_login_box: Shows the first-launch login once, after the [READY]
+# box, where it can't scroll out of sight. Does nothing on any other start. The
+# marker stops the Restart button from showing it again.
+print_first_login_box() {
+  [[ -n "${FIRST_LAUNCH_PASSWORD}" && ! -e "${FIRST_LOGIN_SHOWN_MARKER}" ]] || return 0
+  : > "${FIRST_LOGIN_SHOWN_MARKER}"
+
+  local line
+  echo "  ${C_WARN}╭──────────────────────────────────────────────────────────────╮"
+  printf '  │  %-60s│\n' "FIRST LAUNCH LOGIN: shown this one time" ""
+  for line in "Username: admin" "Password: ${FIRST_LAUNCH_PASSWORD}"; do
+    printf '  │  %s%-60s%s%s│\n' "${C_RESET}${C_BOLD}${C_LOGIN}" "${line}" "${C_RESET}" "${C_WARN}"
   done
-  echo "${C_WARN}╰──────────────────────────────────────────────────────────────╯${C_RESET}" >&2
-  echo "" >&2
+  printf '  │  %-60s│\n' "" "Change this password, and do not post this log publicly" \
+    "until you have. Saved in the auth file:" "${WEBUI_AUTH_FILE}"
+  echo "  ╰──────────────────────────────────────────────────────────────╯${C_RESET}"
+  echo ""
 }
 
 if [[ -n "${COMMANDLINE_ARGS:-}" && " ${COMMANDLINE_ARGS} " =~ [[:space:]]--gradio-auth([=[:space:]]|$) ]]; then
@@ -900,6 +930,7 @@ _poll_for_ready() {
       echo "  │  port is different, use that one.)                                  │"
       echo "  ╰─────────────────────────────────────────────────────────────────────╯${C_RESET}"
       echo ""
+      print_first_login_box
       return 0
     fi
   done

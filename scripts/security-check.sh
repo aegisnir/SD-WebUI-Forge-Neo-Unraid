@@ -101,7 +101,7 @@ check_auth_guardrails() {
   fi
 
   # Check that the image ships no working login: the first-launch password must be random.
-  if grep -q 'openssl rand' start.sh && ! grep -qvE '^[[:space:]]*(#|$)' webui-auth.txt; then
+  if grep -q 'secrets.choice' start.sh && ! grep -qvE '^[[:space:]]*(#|$)' webui-auth.txt; then
     pass "No default login in the seed file; first-launch password is generated"
   else
     fail "Seed file holds a credential, or password generation is missing"

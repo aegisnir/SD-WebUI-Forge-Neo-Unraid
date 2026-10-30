@@ -9,7 +9,7 @@ I am keeping this intentionally lightweight. This is a personal, AI-assisted hob
 
 ### Security
 
-- **No more default password:** a fresh install no longer gets `admin` / `changeme`.  First launch creates a random password for `admin` and shows it once in the container log, and startup stops if one can't be generated.  Existing auth files are not changed: if yours still has the old default, the log keeps warning.  Until you change the first-launch password, don't post that log publicly.
+- **No more default password:** a fresh install no longer gets `admin` / `changeme`.  First launch creates a random memorable password for `admin` and shows it once in the container log, after the `[READY]` box, and startup stops if one can't be generated.  Existing auth files are not changed: if yours still has the old default, the log keeps warning.  Until you change the first-launch password, don't post that log publicly.
 
 ### Added
 

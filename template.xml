@@ -42,7 +42,7 @@
     <b>Authentication defaults:</b>
     This container uses auth-file based login by default.
     On first launch, startup creates <b>/config/auth/webui-auth.txt</b> if missing, with a random password for <b>admin</b>.
-    <b>First login:</b> the password is shown once in the container log. Change it after first login, and do not post that log publicly until you have.
+    <b>First login:</b> the password is shown once in the container log, after the [READY] box. Change it after first login, and do not post that log publicly until you have.
     Forgot it? Delete the auth file and restart: a new password is generated.
     Use <b>WEBUI_AUTH_FILE</b> to override the auth-file path if needed.
     Recommended auth file path: <b>/config/auth/webui-auth.txt</b>

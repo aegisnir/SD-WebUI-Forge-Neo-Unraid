@@ -196,7 +196,7 @@ Gradio's login has no rate limiting or lockout. `WebUI/launch.py` now wraps the 
 
 ### First-launch password in the container log (M-11)
 
-The container generates a random 128-bit password on first launch and prints it once in the container log, so the auth gate is never absent and no shared default exists. Anyone who can read that log can read the password until it is changed or the container is recreated, and users may paste logs into public posts. The log box warns against this. Accepted: reading the log already requires Unraid admin access, and a file-only password would make first login much harder.
+The container generates a random memorable password of about 38 bits on first launch and prints it once in the container log, after the [READY] box, so the auth gate is never absent and no shared default exists. That strength suits an online-only login with lockout (5 failures, 15 minutes), and is much weaker against offline guessing, which is not possible here because the auth file is not a hash to crack: anyone who can read it already has the password. Anyone who can read that log can read the password until it is changed or the container is recreated, and users may paste logs into public posts. The log box warns against this. Accepted: reading the log already requires Unraid admin access, and a file-only password would make first login much harder.
 
 ### SUID strip uses || true (L-6)
 
