@@ -21,7 +21,7 @@ I couldn't find a Forge Neo container built for Unraid, so I made one. I had bee
 > [!NOTE]
 > This project started as an AUTOMATIC1111 container. AUTOMATIC1111 stopped receiving updates in March 2026 and has unpatched security issues, so it was rebased on Forge Neo. If you are coming from the old A1111 image, see [Migration Notes](#migration-notes).
 
-This is a personal hobby project and it is heavily AI-assisted. This is also a learning experience for me as I have never made my own container before or produced anything on this scale for others. I care a lot about security and I am trying to make thoughtful choices, but I am not a programmer or security expert, so mistakes and inaccuracies are likely. If you notice something I could do better, please let me know. I welcome constructive criticism and feedback, and I am willing to learn and correct my mistakes. Thank you for your interest and I hope you find this useful.
+This is a personal hobby project and it is heavily AI-assisted. This is also a learning experience for me which I am sharing with all of you. I care a lot about security and I am trying to make thoughtful choices, but I am not a programmer or security expert, so mistakes and inaccuracies are likely. If you notice something I could do better, please let me know. I welcome constructive criticism and feedback, and I am willing to learn and correct my mistakes. Thank you for your interest and I hope you find this useful.
 
 > [!WARNING]
 > **This container ships software with known, unfixed vulnerabilities**, mainly in Gradio, the web framework Forge Neo is built on. They are all listed in [Known security issues](#known-security-issues), with what this container does about them. Please read that section before you install.
@@ -531,6 +531,8 @@ Forge Neo has about 140 launch flags. Instead of typing them, the Unraid templat
 
 > [!WARNING]
 > **CUDA malloc is on by default** (*maintainer's choice*). Forge Neo itself recommends it: on RTX cards its log prints "Hint: your device supports --cuda-malloc for potential speed improvements". On older cards Neo can't use it, Neo skips it automatically. If you see CUDA memory errors or crashes after a change, set **CUDA malloc** to `false` first.
+>
+> It also blocks two **Torch Compile Integrated** presets: Neo marks `max-autotune` and `reduce-overhead` as not working with `--cuda-malloc` (both use CUDA graphs). To use them, set **CUDA malloc** to `false`.
 
 **Advanced options** (under **Show more settings**):
 

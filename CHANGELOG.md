@@ -7,6 +7,10 @@ I am keeping this intentionally lightweight. This is a personal, AI-assisted hob
 
 ## [Unreleased]
 
+### Documentation
+
+- **CUDA malloc warning** (template and README) now notes that Forge Neo's Torch Compile presets `max-autotune` and `reduce-overhead` do not work while it is on.
+
 ### Fixed (first test on the maintainer's server, 2026-10-29)
 
 - **Crash loop on first start:** Forge Neo unpacks its bundled tokenizer files into its own program folder on first start, which is read-only in this image (`OSError: [Errno 30] Read-only file system`). The build now unpacks them, and checks their SHA-256 using Neo's own code.
