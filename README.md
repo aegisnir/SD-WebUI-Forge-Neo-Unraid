@@ -45,7 +45,7 @@ I built this container for my own Unraid server and the way I use it, then share
 | Extensions **update themselves on every start** | I want extensions kept current without clicking through the Extensions tab | New extension code runs without review, and an update can break an extension or slow startup | Set **Update extensions on start** to `false` ([details](#launch-options)) |
 | Gradio **4.44.1** instead of Forge Neo's 4.40.0 | Fixes 5 known vulnerabilities | Not tested by Forge Neo; parts of the UI may break | [Build with Gradio 4.40.0](#build-with-the-original-gradio-4400) |
 | Newer **GitPython, diffusers and setuptools** than Forge Neo pins | Fixes 10 high-rated vulnerabilities | Not tested by Forge Neo; may break | Build with `--build-arg GITPYTHON_VERSION=3.1.62` (and `DIFFUSERS_VERSION`, `SETUPTOOLS_VERSION`), the same way as [the Gradio build](#build-with-the-original-gradio-4400) |
-| A starter login `admin` / `changeme` is created and the WebUI still starts | The WebUI is never without a login, and first setup stays simple | Weak until you change it | Change the password in the auth file ([details](#authentication-defaults)) |
+| A random login is created on first start and shown once in the container log | The WebUI is never without a login, and there is no shared default password | The password stays in the log until the container is recreated | Change the password in the auth file ([details](#authentication-defaults)) |
 | HTTPS with a **self-signed** certificate | Encryption on my network without extra setup | Your browser warns once | Use your own certificate, or `WEBUI_TLS=off` ([details](#https--tls)) |
 | Login lockout after **5** failed attempts for **15** minutes | Slows down password guessing | Typos can lock you out for a while | `WEBUI_LOGIN_MAX_ATTEMPTS`, `WEBUI_LOGIN_LOCKOUT_MINUTES` ([details](#login-protection)) |
 | Files in `/data` readable from the host (no strict `UMASK`) | I manage models and images over SMB | Other users and apps on the server can read them | Set `UMASK=0027` ([details](#storage-and-permissions)) |
@@ -176,7 +176,7 @@ Forge Neo did remove AUTOMATIC1111's `.yaml` model-config code-execution path (C
 
 | Risk | Why it exists | What you can do |
 |---|---|---|
-| Default login `admin` / `changeme` on first start | So the WebUI is never without a login | Change it right away. The log warns until you do. |
+| The first-start password is in the container log | It is the one place you can see it without opening a file | Change it right away, and do not post that log publicly until you have. |
 | Password guessing | Gradio itself has no limit on login attempts | This container locks a username after 5 failures for 15 minutes ([Login protection](#login-protection)). Keep it off the internet as well. |
 | Extensions run their own code, and anyone who can log in can install one | That is how WebUI extensions work; installing from the WebUI is on by default | Only install extensions you trust. Remove `--enable-insecure-extension-access` from Extra Args to lock the Extensions tab. |
 | `/data/python-user` holds packages installed by extensions, and runs on every start | The image itself is read-only, so extension packages live here | If you suspect a problem, delete that folder and restart the container. Extensions reinstall what they need during that start. |
@@ -250,7 +250,7 @@ The included Unraid template sets `--runtime=nvidia` in Extra Parameters by defa
 
    **If you choose Bridge** (recommended for most users), map container port `7860` to a host port of your choice (default: `7860`).
 
-4. **Review the default login credentials.** The container seeds `admin` / `changeme` on first launch. Change this after your first login. See [Authentication](#authentication-defaults).
+4. **Get your login from the log.** On first launch the container creates a random password for `admin` and shows it once in the container log. Change it after your first login. See [Authentication](#authentication-defaults).
 
 5. **Start the container.** Everything the WebUI needs is built into the image, so it usually starts in a minute or two. See [First Launch: What to Expect](#first-launch-what-to-expect) for what healthy logs look like.
 
@@ -297,7 +297,7 @@ A `[READY]` box appears once the WebUI accepts connections. If the container fin
 
 ## Getting Your First Model
 
-After the container starts, you will see a login page. Log in with `admin` / `changeme` (the default credentials). If you have not added a model yet, the WebUI starts but cannot generate images. This is expected.
+After the container starts, you will see a login page. Log in with `admin` and the password shown in the container log on first launch. If you have not added a model yet, the WebUI starts but cannot generate images. This is expected.
 
 You need at least one model (checkpoint) to generate images. Models are usually `.safetensors` files (Neo also loads `.gguf` and `.ckpt`), typically 2–7 GB each. Forge Neo also runs newer model families such as Flux, Qwen and Wan.
 
@@ -416,14 +416,18 @@ What happens when you fill one in:
 This container enables the WebUI login page by default. The API is disabled by default unless you set the **API** option (`NEO_API`) to `true`.
 
 > [!IMPORTANT]
-> **Maintainer's choice.** The container creates a starter login and still starts, so the WebUI is never left without one. The trade-off is a weak password until you change it, and the log keeps warning until you do.
+> **Maintainer's choice.** The container creates a random password on first launch and shows it once in the log, so the WebUI is never left without a login and no shared default exists. The trade-off is that the password stays in the log until the container is recreated, so do not post that log publicly until you have changed it.
 
-**Default credentials (seeded on first launch):**
+**First login:**
 
 - Username: `admin`
-- Password: `changeme`
+- Password: random, shown once in the container log on first launch, and saved in the auth file
 
 Change this as soon as possible after first login.
+
+**Forgot your password?** Delete the auth file and restart the container. A new password is generated and shown in the log.
+
+Upgrading from an older version? An existing auth file is never changed. If it still uses the old default password, the log keeps warning until you change it.
 
 **Auth file location:**
 
@@ -1048,7 +1052,7 @@ The image pins `torch` and `torchvision` to the versions Forge Neo itself instal
 | Item | Value |
 |---|---|
 | **Default WebUI URL** | `https://<unraid-ip>:7860` (self-signed certificate) |
-| **Default login** | `admin` / `changeme` |
+| **First login** | `admin`, random password from the first-launch log |
 | **Auth file (host)** | `/mnt/user/appdata/SD-WebUI-Forge-Neo-Unraid/auth/webui-auth.txt` |
 | **Models directory (host)** | `<data-path>/models/Stable-diffusion/` |
 | **Outputs directory (host)** | `<data-path>/output/` |

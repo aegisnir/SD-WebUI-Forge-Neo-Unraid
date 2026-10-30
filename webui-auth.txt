@@ -1,13 +1,13 @@
-# Default WebUI auth file template
-# This file is auto-seeded to /config/auth/webui-auth.txt on first launch if missing.
+# WebUI auth file
+# Created on first launch at /config/auth/webui-auth.txt if it is missing.
 #
 # IMPORTANT:
-# - Default first-launch login is admin:changeme.
-# - Replace the default password as soon as possible.
+# - The password below was generated randomly on first launch.
+# - It was shown once in the container log. Replace it with your own.
+# - Forgot it? Delete this file and restart: a new one is generated.
 #
 # Format:
 # - one credential per line as username:password
 # - or multiple comma-separated credentials on one line
 # - blank lines and lines starting with # are ignored
 
-admin:changeme

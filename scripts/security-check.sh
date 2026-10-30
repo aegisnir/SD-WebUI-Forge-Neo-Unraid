@@ -100,6 +100,13 @@ check_auth_guardrails() {
     fail "Auth-file first-launch seeding missing"
   fi
 
+  # Check that the image ships no working login: the first-launch password must be random.
+  if grep -q 'openssl rand' start.sh && ! grep -qvE '^[[:space:]]*(#|$)' webui-auth.txt; then
+    pass "No default login in the seed file; first-launch password is generated"
+  else
+    fail "Seed file holds a credential, or password generation is missing"
+  fi
+
   # Check that auth-file presence/content validation is still enforced.
   if grep -q 'auth file is missing' start.sh && grep -q 'auth file is empty' start.sh && grep -q 'no usable credentials' start.sh; then
     pass "Auth-file presence and parseability guards are present"

@@ -41,9 +41,9 @@
 
     <b>Authentication defaults:</b>
     This container uses auth-file based login by default.
-    On first launch, startup seeds <b>/config/auth/webui-auth.txt</b> if missing.
-    <b>Default end-user login (first launch):</b> <b>admin</b> / <b>changeme</b>
-    Startup does not block this default; change it after first login for normal use.
+    On first launch, startup creates <b>/config/auth/webui-auth.txt</b> if missing, with a random password for <b>admin</b>.
+    <b>First login:</b> the password is shown once in the container log. Change it after first login, and do not post that log publicly until you have.
+    Forgot it? Delete the auth file and restart: a new password is generated.
     Use <b>WEBUI_AUTH_FILE</b> to override the auth-file path if needed.
     Recommended auth file path: <b>/config/auth/webui-auth.txt</b>
     Example syntax:
@@ -55,7 +55,7 @@
     Forge Neo never downloads a model on its own. Add a <b>.safetensors</b> file under <b>/data/models/Stable-diffusion</b>.
 
     <b>Log safety:</b>
-    Sensitive auth flags (<b>--gradio-auth</b>, <b>--gradio-auth-path</b>, <b>--api-auth</b>) have their values replaced with <b>&lt;redacted&gt;</b> in startup log output, so logs are safe to share.
+    Sensitive auth flags (<b>--gradio-auth</b>, <b>--gradio-auth-path</b>, <b>--api-auth</b>) have their values replaced with <b>&lt;redacted&gt;</b> in startup log output. The one exception is the first-launch login box.
 
     <b>Built-in healthcheck:</b>
     The image includes a Docker HEALTHCHECK that probes port 7860. It uses generous timers (5 min start grace, 5 retries) to avoid false positives during model loading or heavy extension operations. Unhealthy status is informational only and does not auto-restart the container.
@@ -95,7 +95,7 @@
   <Config Name="Data Directory" Type="Path" Target="/data" Default="/mnt/user/ai/data/" Mode="rw" Display="always" Required="true" Mask="false" Description="Host path for everything the WebUI stores: models, outputs, extensions and caches. This one folder handles everything. Default: /mnt/user/ai/data/ (outside appdata)."/>
   <Config Name="Models Directory (optional)" Type="Path" Target="/data/models" Default="" Mode="rw" Display="always" Required="false" Mask="false" Description="OPTIONAL. Leave empty: models stay inside the Data Directory, which handles everything. Fill in only for more granular control, for example a separate models share you also use elsewhere. Move your existing models first: this hides the Data Directory's own models folder. The container never changes this folder's owner; it must be writable by 99:100 (nobody:users)."/>
   <Config Name="Outputs Directory (optional)" Type="Path" Target="/data/output" Default="" Mode="rw" Display="always" Required="false" Mask="false" Description="OPTIONAL. Leave empty: images are saved inside the Data Directory, which handles everything. Fill in only for more granular control, for example a share you browse from another computer. The container never changes this folder's owner; it must be writable by 99:100 (nobody:users)."/>
-  <Config Name="WebUI Auth File" Type="Variable" Target="WEBUI_AUTH_FILE" Default="/config/auth/webui-auth.txt" Display="always" Required="true" Mask="false" Description="Path inside the container to the WebUI auth file (recommended/default: /config/auth/webui-auth.txt). If the file is missing on first launch, startup seeds it from the repository default template. Default seeded login is admin:changeme. Format: username:password per line, or comma-separated entries on one line. Blank lines and # comments are ignored. For security, change the default password after first login."/>
+  <Config Name="WebUI Auth File" Type="Variable" Target="WEBUI_AUTH_FILE" Default="/config/auth/webui-auth.txt" Display="always" Required="true" Mask="false" Description="Path inside the container to the WebUI auth file (recommended/default: /config/auth/webui-auth.txt). If the file is missing on first launch, startup creates it with a random password for admin, shown once in the container log. Format: username:password per line, or comma-separated entries on one line. Blank lines and # comments are ignored. For security, change that password after first login."/>
   <Config Name="HTTPS" Type="Variable" Target="WEBUI_TLS" Default="auto|off" Display="always" Required="false" Mask="false" Description="auto (default): serve HTTPS. Uses /config/tls/custom.crt and custom.key if you provide both, otherwise a self-signed certificate created in /config/tls (your browser warns once; compare the SHA-256 fingerprint printed in the log). off: plain HTTP."/>
   <Config Name="HTTPS Hostnames" Type="Variable" Target="WEBUI_TLS_HOSTNAMES" Default="" Display="always" Required="false" Mask="false" Description="Recommended: the full hostname (FQDN) you open the WebUI with, then the server's IP, separated by a comma with no spaces. Example: myserver.example.com,192.168.1.10. Both are added to the self-signed certificate so the browser's address matches it either way."/>
   <Config Name="GPU (NVIDIA_VISIBLE_DEVICES)" Type="Variable" Target="NVIDIA_VISIBLE_DEVICES" Default="all" Display="always" Required="false" Mask="false" Description="Which NVIDIA GPUs this container gets. all (default), or one GPU's UUID (shown by the Unraid NVIDIA driver plugin, or nvidia-smi -L), to keep other GPUs for Plex or a VM. Works together with --runtime=nvidia in Extra Parameters."/>

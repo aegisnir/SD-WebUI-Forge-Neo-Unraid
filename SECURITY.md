@@ -61,7 +61,8 @@ grep -n "id -u\|setpriv\|NoNewPrivs\|CapEff" entrypoint.sh start.sh
 
 ### Authentication guardrails
 
-- [ ] PASS if startup seeds a default auth-file containing `admin:changeme` on first launch when the file is missing.
+- [ ] PASS if startup creates the auth file with a random password on first launch when the file is missing, and stops if it cannot generate one.
+- [ ] PASS if the image ships no working login (`webui-auth.txt` holds comments only).
 - [ ] PASS if startup requires a present, non-empty, parseable auth-file before launch.
 - [ ] PASS if `WEBUI_AUTH_FILE` is supported and documented as the sole supported credential mechanism.
 - [ ] PASS if API auth is not silently left open when WebUI auth is configured (mirror behavior or explicit override required).
@@ -193,9 +194,9 @@ Gradio's login has no rate limiting or lockout. `WebUI/launch.py` now wraps the 
 
 `webui-auth.txt` stores credentials as `username:password` in plaintext. This is the format the WebUI's Gradio auth expects (unchanged in Forge Neo). The file is created with mode 600 (owner-read-only) and lives on a host-mounted volume. Hashing would require patching upstream Gradio auth. Accepted: file permissions are the primary control.
 
-### Default credentials on first launch (M-11)
+### First-launch password in the container log (M-11)
 
-The container seeds `admin:changeme` on first launch to ensure the auth gate is never absent. A prominent startup warning is displayed. Blocking startup until custom credentials exist would break the first-boot experience (container starts, user configures via WebUI or file edit). The current approach prioritizes "always authenticated" over "never uses defaults."
+The container generates a random 128-bit password on first launch and prints it once in the container log, so the auth gate is never absent and no shared default exists. Anyone who can read that log can read the password until it is changed or the container is recreated, and users may paste logs into public posts. The log box warns against this. Accepted: reading the log already requires Unraid admin access, and a file-only password would make first login much harder.
 
 ### SUID strip uses || true (L-6)
 

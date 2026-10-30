@@ -30,7 +30,7 @@
   - free-space checks and clearer startup errors
   - `build-essential` + `python3-dev` in base image so C extension builds (e.g. hnswlib) work without workarounds
 - Authentication flow improved:
-  - default WebUI login enabled; auth-file seeded on first launch (`admin:changeme`)
+  - default WebUI login enabled; auth-file created on first launch with a random password, shown once in the log
   - `WEBUI_AUTH_FILE` support
   - API auth mirroring behavior controls
   - runtime auth-file sanitizer prevents Gradio crash on comments/blank lines

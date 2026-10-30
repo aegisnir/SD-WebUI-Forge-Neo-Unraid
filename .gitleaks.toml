@@ -6,10 +6,9 @@ title = "gitleaks"
 [allowlist]
   description = "Known-safe values and files"
 
-  # webui-auth.txt is a committed default-credentials placeholder
-  # (admin:changeme). Users are explicitly instructed to change this on first
-  # login. The file is written with chmod 600 at runtime and is documented
-  # throughout the README. It is not a deployed secret.
+  # webui-auth.txt now holds comments only: the first-launch password is random.
+  # Older commits still contain the former placeholder login, which was
+  # documented publicly and is not a deployed secret, so the path stays listed.
   paths = [
     '''webui-auth.txt''',
   ]

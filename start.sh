@@ -413,17 +413,52 @@ write_runtime_auth_file() {
   _auth_file_tool --write "$1" "$2"
 }
 
+# seed_auth_file: First launch only. Creates the auth file with a random admin
+# password and shows it once in the log. Stops startup if no password can be
+# generated: there is deliberately no fallback to a default password.
+seed_auth_file() {
+  local password line
+  password="$(openssl rand -hex 16 2>/dev/null)" || password=""
+  if [[ ! "${password}" =~ ^[0-9a-f]{32}$ ]]; then
+    echo "${C_CRIT}${C_BOLD}CRITICAL:${C_RESET}${C_CRIT} Could not generate a random WebUI password. Refusing to start without a login.${C_RESET}" >&2
+    exit 1
+  fi
+
+  # umask 077: never world-readable, even briefly. Built under a temporary name
+  # so a crash can't leave a half-written auth file behind.
+  (
+    umask 077
+    cp "${WEBUI_AUTH_SAMPLE_FILE}" "${WEBUI_AUTH_FILE}.tmp.$$"
+    printf 'admin:%s\n' "${password}" >> "${WEBUI_AUTH_FILE}.tmp.$$"
+    mv -f "${WEBUI_AUTH_FILE}.tmp.$$" "${WEBUI_AUTH_FILE}"
+  )
+
+  echo "" >&2
+  echo "${C_WARN}╭──────────────────────────────────────────────────────────────╮${C_RESET}" >&2
+  for line in \
+    "FIRST LAUNCH LOGIN: shown this one time" \
+    "" \
+    "  Username: admin" \
+    "  Password: ${password}" \
+    "" \
+    "Change this password, and do not post this log publicly" \
+    "until you have. Saved in the auth file:" \
+    "  ${WEBUI_AUTH_FILE}"; do
+    printf '%s│  %-60s│%s\n' "${C_WARN}" "${line}" "${C_RESET}" >&2
+  done
+  echo "${C_WARN}╰──────────────────────────────────────────────────────────────╯${C_RESET}" >&2
+  echo "" >&2
+}
+
 if [[ -n "${COMMANDLINE_ARGS:-}" && " ${COMMANDLINE_ARGS} " =~ [[:space:]]--gradio-auth([=[:space:]]|$) ]]; then
   echo "${C_INFO}WebUI authentication is being managed via COMMANDLINE_ARGS.${C_RESET}" >&2
 elif [[ -n "${COMMANDLINE_ARGS:-}" && " ${COMMANDLINE_ARGS} " =~ [[:space:]]--gradio-auth-path([=[:space:]]|$) ]]; then
   echo "${C_INFO}WebUI authentication file is being managed via COMMANDLINE_ARGS.${C_RESET}" >&2
 else
-  # Seed the default auth file on first launch if it does not exist yet.
+  # Create the auth file on first launch if it does not exist yet. An existing
+  # file is never touched.
   if [[ ! -f "${WEBUI_AUTH_FILE}" && -f "${WEBUI_AUTH_SAMPLE_FILE}" ]]; then
-    # Create the seeded auth file with restrictive permissions from the start
-    # so credentials are never world-readable, even briefly (umask 077 → 600).
-    ( umask 077; cp "${WEBUI_AUTH_SAMPLE_FILE}" "${WEBUI_AUTH_FILE}" )
-    echo "${C_WARN}Seeded default auth file at ${WEBUI_AUTH_FILE}.${C_RESET}" >&2
+    seed_auth_file
   fi
 
   if [[ ! -f "${WEBUI_AUTH_FILE}" ]]; then
