@@ -686,8 +686,9 @@ print_launch_notice() {
   # gets an inline [NOTE] where it appears (monitor_webui_output below).
   echo "  ${ACCENT}Known harmless messages you may see in the log below:${RESET}"
   echo "  ${ACCENT}▸ 'You are running Gradio 4.44.1, while this program was built on Gradio 4.40.0'${RESET}"
+  echo "    ${INFO}  (with 'Delete the venv folder...' and 'Use --skip-version-check...')${RESET}"
   echo "    ${INFO}→ Expected: this image upgrades Gradio for security (see README).${RESET}"
-  echo "    ${INFO}  Ignore its 'delete the venv folder' advice: there is no venv here.${RESET}"
+  echo "    ${INFO}  There is no venv to delete, and --skip-version-check isn't needed.${RESET}"
   echo "  ${ACCENT}▸ 'To create a public link, set \`share=True\` in \`launch()\`.'${RESET}"
   echo "    ${INFO}→ Gradio's standard line. Public links are blocked in this container on purpose.${RESET}"
   echo "  ${ACCENT}▸ 'Hint: your device supports --cuda-malloc'${RESET}"
@@ -737,7 +738,7 @@ monitor_webui_output() {
     # Neo's version check: expected, this image ships Gradio 4.44.1 on purpose.
     # Its advice to delete the venv folder doesn't apply (there is no venv).
     if [[ "${line}" == "Delete the venv folder to do a reinstall is recommended."* ]]; then
-      echo "  ${C_INFO}[NOTE] ↑ Expected: this image upgrades Gradio for security. There is no venv here; nothing to delete.${C_RESET}"
+      echo "  ${C_INFO}[NOTE] ↑ Expected: this image upgrades Gradio for security. No venv to delete; --skip-version-check isn't needed.${C_RESET}"
     fi
 
     # Gradio prints this on every launch; --share is blocked in this container.

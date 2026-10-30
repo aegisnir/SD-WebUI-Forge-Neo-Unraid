@@ -7,7 +7,7 @@ flag string, shell-quoted, on stdout. Messages for the log go to stderr.
   1. Flags the container manages are always added: --listen --port 7860
      --data-dir /data.
   2. Each NEO_* option adds its flag. Defaults match Forge Neo (all off),
-     except the two maintainer's choices noted in OPTIONS.
+     except the three maintainer's choices noted in OPTIONS.
   3. Extra Launch Flags come last. Flags that an option controls, that the
      container manages, or that are not allowed in this container are
      removed, with a message naming what to use instead. Options always win.
@@ -100,7 +100,8 @@ OPTIONS = [
     ("NEO_HIDE_UI_DIR_CONFIG", "Hide folder settings", flag("--hide-ui-dir-config"), "false"),
     ("NEO_EXTENSIONS", "Extensions", choice({"enabled": [], "builtin-only": ["--disable-extra-extensions"],
                                              "disabled": ["--disable-all-extensions"]}), "enabled"),
-    ("NEO_UPDATE_EXTENSIONS", "Update extensions on start", flag("--update-all-extensions"), "false"),
+    # Maintainer's choice (Neo default: false): keep extensions current.
+    ("NEO_UPDATE_EXTENSIONS", "Update extensions on start", flag("--update-all-extensions"), "true"),
     ("NEO_SUBPATH", "Reverse-proxy subpath", value("--subpath", "subpath"), ""),
     ("NEO_NO_HASHING", "No checkpoint hashing", flag("--no-hashing"), "false"),
     ("NEO_LOGLEVEL", "Log level", choice({"default": [], **{v: ["--loglevel", v] for v in

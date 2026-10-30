@@ -38,6 +38,7 @@ I built this container for my own Unraid server and the way I use it, then share
 |---|---|---|---|
 | Installing extensions from the WebUI is **on** | I install extensions from the WebUI | Anyone who can log in can run code in the container | Set **Install extensions from the WebUI** to `false` ([details](#extension-management-is-on-by-default)) |
 | **CUDA malloc** is on | Forge Neo's own log recommends it on RTX cards | Rarely, memory errors on some setups | Set **CUDA malloc** to `false` ([details](#launch-options)) |
+| Extensions **update themselves on every start** | I want extensions kept current without clicking through the Extensions tab | New extension code runs without review, and an update can break an extension or slow startup | Set **Update extensions on start** to `false` ([details](#launch-options)) |
 | Gradio **4.44.1** instead of Forge Neo's 4.40.0 | Fixes 5 known vulnerabilities | Not tested by Forge Neo; parts of the UI may break | [Build with Gradio 4.40.0](#build-with-the-original-gradio-4400) |
 | Newer **GitPython, diffusers and setuptools** than Forge Neo pins | Fixes 10 high-rated vulnerabilities | Not tested by Forge Neo; may break | Build with `--build-arg GITPYTHON_VERSION=3.1.62` (and `DIFFUSERS_VERSION`, `SETUPTOOLS_VERSION`), the same way as [the Gradio build](#build-with-the-original-gradio-4400) |
 | A starter login `admin` / `changeme` is created and the WebUI still starts | The WebUI is never without a login, and first setup stays simple | Weak until you change it | Change the password in the auth file ([details](#authentication-defaults)) |
@@ -506,7 +507,7 @@ Gradio's login page has no limit on password guesses. This container adds one. I
 
 Forge Neo has about 140 launch flags. Instead of typing them, the Unraid template asks for the useful ones as options: dropdowns with a one-line explanation each. The container turns them into Neo's flags at startup.
 
-- **Defaults match Forge Neo's** (every flag off), with two exceptions marked *maintainer's choice* below.
+- **Defaults match Forge Neo's** (every flag off), with three exceptions marked *maintainer's choice* below.
 - **Common options** are always visible. **Advanced options** are under **Show more settings** in the template.
 - Options that only work together say so. For example, *API request logging* does nothing unless *API* is `true`.
 - Everything not offered as an option still works through [Extra Launch Flags](#commandline_args).
@@ -561,7 +562,7 @@ Forge Neo has about 140 launch flags. Instead of typing them, the Unraid templat
 | Lock settings (`NEO_FREEZE_SETTINGS`) | `--freeze-settings` | `false` | Nobody can change settings in the WebUI |
 | Hide folder settings (`NEO_HIDE_UI_DIR_CONFIG`) | `--hide-ui-dir-config` | `false` | Hides output-folder settings in the WebUI |
 | Extensions (`NEO_EXTENSIONS`) | `--disable-extra-extensions` / `--disable-all-extensions` | `enabled` | `builtin-only` or `disabled`, for troubleshooting a broken extension |
-| Update extensions on start (`NEO_UPDATE_EXTENSIONS`) | `--update-all-extensions` | `false` | Pulls updates for every extension on each start |
+| Update extensions on start (`NEO_UPDATE_EXTENSIONS`) | `--update-all-extensions` | `true` | *Maintainer's choice* (Neo: `false`). Pulls updates for every installed extension on each start. Trade-off: new extension code runs without you reviewing it, and an update can break an extension. Set `false` to update by hand from the Extensions tab |
 | Reverse-proxy subpath (`NEO_SUBPATH`) | `--subpath` | empty | For a reverse proxy serving the WebUI under a path, for example `sd` |
 | No checkpoint hashing (`NEO_NO_HASHING`) | `--no-hashing` | `false` | Faster model loading; model hashes are missing from image info |
 | Log level (`NEO_LOGLEVEL`) | `--loglevel` | `default` | `DEBUG` to `CRITICAL` |
