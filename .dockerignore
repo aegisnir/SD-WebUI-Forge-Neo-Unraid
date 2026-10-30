@@ -13,8 +13,10 @@ CONTRIBUTING.md
 VERSIONING.md
 STATUS.md
 
-# Scripts (dev-only, not shipped in image)
-scripts/
+# Scripts (dev-only, not shipped in image), except the layer-split helper the
+# build stage runs (see Dockerfile).
+scripts/*
+!scripts/split-layers.py
 
 # Icon (referenced by URL, not bundled)
 icon.png
