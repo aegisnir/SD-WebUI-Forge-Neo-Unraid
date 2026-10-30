@@ -446,6 +446,10 @@ RUN mkdir -p /config/webui && chown -R sdwebui:sdwebui /config
 # container that has no keyboard. See WebUI/launch.py.
 COPY --chown=${APP_UID}:${APP_GID} WebUI/launch.py "${WEBUI_DIR}/launch.py"
 
+# Add a CSS-only built-in extension that fixes Lobe Theme's layout on Forge Neo.
+# Its rules apply only while Lobe is loaded. See WebUI/extensions-builtin/.
+COPY --chown=${APP_UID}:${APP_GID} WebUI/extensions-builtin/lobe-theme-fixes/ "${WEBUI_DIR}/extensions-builtin/lobe-theme-fixes/"
+
 # ------------------------------------------------------------------------------
 # Copy entrypoint scripts (from this repository)
 #

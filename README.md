@@ -780,6 +780,14 @@ The container automatically restarts the WebUI process if it exits, so you do no
 ### The WebUI loads but cannot generate
 - You probably have no model yet. See [Getting Your First Model](#getting-your-first-model).
 
+### Lobe Theme looks broken
+[Lobe Theme](https://github.com/lobehub/sd-webui-lobe-theme) by LobeHub has layout bugs on Forge Neo. This image includes a small CSS-only built-in extension, `lobe-theme-fixes`, for these three:
+- A giant white triangle on the VAE / Text Encoder dropdown.
+- The Quick Settings panel going blank when you click that dropdown.
+- Settings section names stacked one letter per line.
+
+Its rules apply only while Lobe is loaded, so nothing changes if you don't use Lobe. To turn the fixes off, untick `lobe-theme-fixes` in **Extensions** > **Installed** and apply.
+
 ### The GPU is not being used
 - Re-run the [GPU sanity check](#gpu-sanity-check).
 - Confirm the container still has `--runtime=nvidia` in Extra Parameters.

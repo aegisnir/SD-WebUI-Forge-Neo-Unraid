@@ -1,0 +1,30 @@
+/* Lobe Theme layout fixes for Forge Neo.  Every rule applies only while Lobe's panel is on the page. */
+
+/* Dropdown arrow rendered at giant size in Quick Settings */
+body:has(.draggable-panel) svg.dropdown-arrow {
+  width: 18px !important;
+  height: 18px !important;
+  flex: none !important;
+}
+
+/* Settings section list squashed to one letter per line */
+body:has(.draggable-panel) #settings > .tab-nav {
+  flex: 0 0 220px !important;
+  width: 220px !important;
+  min-width: 220px !important;
+}
+
+/* Dropdown contents wider than the box: clicking scrolled the whole panel out of view */
+body:has(.draggable-panel) #quicksettings .wrap-inner,
+body:has(.draggable-panel) #quicksettings .secondary-wrap {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+body:has(.draggable-panel) #quicksettings .secondary-wrap input {
+  flex: 1 1 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+}

@@ -97,6 +97,8 @@
 - Nightly update check: first run (started by hand, 2026-10-30) passed, committed
   `package_versions.txt` and published `:dev`. The registry build cache cut the next build to 8 minutes.
 - Layer reuse confirmed: the update to `fb10561` on the maintainer's server took about 3 seconds.
+- Lobe Theme layout fixes added as the built-in extension `lobe-theme-fixes`. The rules worked when
+  pasted into a live browser tab; the Lobe-only scoping and the built image are not tested yet.
 
 ## Remaining
 
