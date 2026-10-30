@@ -39,14 +39,23 @@ on:
       - "LICENSES/**"
       - ".github/ISSUE_TEMPLATE/**"
       - ".github/PULL_REQUEST_TEMPLATE.md"
-      - "package_versions.txt"
+      - "package_versions.*.txt"
   workflow_dispatch:
   workflow_call:
+    # The nightly check (check-updates.yml) calls this once per channel. It
+    # always runs from the default branch, so it names the branch to build
+    # here instead of relying on the branch the run started from.
+    inputs:
+      branch:
+        description: "Branch to build: dev or main"
+        type: string
+        required: false
+        default: ""
 
 # One build per ref at a time. Queued, not cancelled, so a nightly publish and
 # a push build can't cancel each other halfway through.
 concurrency:
-  group: build-image-${{ github.ref }}
+  group: build-image-${{ inputs.branch && format('refs/heads/{0}', inputs.branch) || github.ref }}
   cancel-in-progress: false
 
 permissions:
@@ -78,21 +87,37 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6.0.0
+        with:
+          # Empty on push and manual runs: checks out the commit that started the run.
+          ref: ${{ inputs.branch }}
 
       - name: Work out tags and version
         id: meta
+        env:
+          BRANCH_INPUT: ${{ inputs.branch }}
         run: |
-          short_sha="${GITHUB_SHA::7}"
-          case "${GITHUB_REF}" in
+          # A nightly call names its branch; only dev and main are accepted, so
+          # a bad value stops the run before anything is published.
+          if [[ -n "${BRANCH_INPUT}" ]]; then
+            case "${BRANCH_INPUT}" in
+              dev|main) ref="refs/heads/${BRANCH_INPUT}"; ref_name="${BRANCH_INPUT}" ;;
+              *) echo "::error::Unexpected branch input: ${BRANCH_INPUT}"; exit 1 ;;
+            esac
+          else
+            ref="${GITHUB_REF}"; ref_name="${GITHUB_REF_NAME}"
+          fi
+          # The commit actually checked out, which differs from GITHUB_SHA on a nightly call.
+          short_sha="$(git rev-parse --short=7 HEAD)"
+          case "${ref}" in
             refs/heads/dev)  channel="dev" ;;
             refs/heads/main) channel="latest" ;;
-            refs/tags/v*)    channel="${GITHUB_REF_NAME}" ;;
+            refs/tags/v*)    channel="${ref_name}" ;;
             *)               channel="" ;;
           esac
-          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
-            version="${GITHUB_REF_NAME}"
+          if [[ "${ref}" == refs/tags/v* ]]; then
+            version="${ref_name}"
           else
-            version="${GITHUB_REF_NAME}-${short_sha}"
+            version="${ref_name}-${short_sha}"
           fi
           {
             echo "build_tag=${IMAGE}:sha-${short_sha}"

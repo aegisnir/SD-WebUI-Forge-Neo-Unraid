@@ -1,20 +1,30 @@
 name: Nightly update check
 
 # Publishes a new image only when the packages inside it would change
-# (the method linuxserver.io uses). Every night at 04:00 US Eastern:
-#   1. Build the image with today's Ubuntu updates (APT_REFRESH) and, once a
-#      month, fresh Python packages (PY_REFRESH), reusing the build cache.
-#      Nothing is pushed in this step.
-#   2. List every package in it (dpkg and pip) and compare the list with
-#      package_versions.txt.
-#   3. If it changed: commit the new list (the diff shows exactly what
-#      changed), then run build-image.yml, which builds, scans with Trivy and
-#      publishes :dev. If not: publish nothing, so Unraid shows no update.
+# (the method linuxserver.io uses). Every night at 04:00 US Eastern, once for
+# each channel (dev -> :dev, main -> :latest), one after the other:
+#   1. Build the channel's branch with today's Ubuntu updates (APT_REFRESH)
+#      and, once a month, fresh Python packages (PY_REFRESH), reusing the
+#      build cache. Nothing is pushed in this step.
+#   2. List every package in it (dpkg and pip) and compare the list with the
+#      channel's file on dev: package_versions.dev.txt or
+#      package_versions.latest.txt.
+#   3. If it changed: commit the new list to dev (the diff shows exactly what
+#      changed), then run build-image.yml for that branch, which builds, scans
+#      with Trivy and publishes the channel tag. If not: publish nothing, so
+#      Unraid shows no update.
+#
+# Both lists live on dev, so the bot never commits to main and merging dev
+# into main never conflicts. Each channel publishes on its own: a failure in
+# one does not stop the other.
+#
+# Scheduled workflows always run from the default branch (main), using the
+# copy of this file on that branch. A change here takes effect at night only
+# after it is merged into main.
 #
 # GitHub disables scheduled workflows after 60 days without repository
-# activity. When nothing changed, the "# Checked:" line in
-# package_versions.txt is still updated once a month, and that commit counts
-# as activity.
+# activity. When nothing changed, the "# Checked:" line in each list is still
+# updated once a month, and that commit counts as activity.
 #
 # Commits made with GITHUB_TOKEN do not trigger other workflows, so this
 # workflow calls build-image.yml itself instead of relying on the push.
@@ -40,14 +50,27 @@ env:
 
 jobs:
   check:
-    name: Build and compare package list
+    name: Build and compare package list (${{ matrix.branch }})
     runs-on: ubuntu-latest
     timeout-minutes: 120
     permissions:
       contents: write
       packages: read
+    strategy:
+      # One channel at a time: halves the load on the build cache, and the
+      # second run starts from a dev branch that already has the first's commit.
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        include:
+          - branch: dev
+            list: package_versions.dev.txt
+          - branch: main
+            list: package_versions.latest.txt
+    # Each run sets only its own output, so the two don't overwrite each other.
     outputs:
-      changed: ${{ steps.compare.outputs.changed }}
+      changed_dev: ${{ steps.compare.outputs.changed_dev }}
+      changed_main: ${{ steps.compare.outputs.changed_main }}
 
     steps:
       - name: Free runner disk space
@@ -58,10 +81,17 @@ jobs:
           sudo docker image prune --all --force > /dev/null
           df -h /
 
-      - name: Checkout dev
+      - name: Checkout ${{ matrix.branch }} (the code to build)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6.0.0
+        with:
+          ref: ${{ matrix.branch }}
+          path: build
+
+      - name: Checkout dev (where the package lists live)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6.0.0
         with:
           ref: dev
+          path: lists
 
       - name: Work out refresh values
         id: meta
@@ -85,7 +115,7 @@ jobs:
       - name: Build test image (not pushed)
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
-          context: .
+          context: build
           platforms: linux/amd64
           load: true
           push: false
@@ -105,36 +135,55 @@ jobs:
 
       - name: Compare and commit
         id: compare
+        working-directory: lists
+        env:
+          BRANCH: ${{ matrix.branch }}
+          LIST: ${{ matrix.list }}
         run: |
           month="$(TZ=America/New_York date +%Y-%m)"
-          old_body="$(grep -v '^# Checked:' package_versions.txt 2>/dev/null || true)"
+          old_body="$(grep -v '^# Checked:' "${LIST}" 2>/dev/null || true)"
           new_body="$(cat /tmp/packages.txt)"
-          old_month="$(sed -n 's/^# Checked: //p' package_versions.txt 2>/dev/null || true)"
+          old_month="$(sed -n 's/^# Checked: //p' "${LIST}" 2>/dev/null || true)"
           if [[ "${old_body}" != "${new_body}" ]]; then
             changed=true
-            message="chore: package updates ($(TZ=America/New_York date +%F))"
+            message="chore: package updates for ${BRANCH} ($(TZ=America/New_York date +%F))"
           elif [[ "${old_month}" != "${month}" ]]; then
             changed=false
-            message="chore: monthly package check-in (${month}, no changes)"
+            message="chore: monthly package check-in for ${BRANCH} (${month}, no changes)"
           else
-            echo "No package changes. Nothing to publish."
-            echo "changed=false" >> "${GITHUB_OUTPUT}"
+            echo "No package changes for ${BRANCH}. Nothing to publish."
+            echo "changed_${BRANCH}=false" >> "${GITHUB_OUTPUT}"
             exit 0
           fi
-          { echo "# Checked: ${month}"; echo "${new_body}"; } > package_versions.txt
+          { echo "# Checked: ${month}"; echo "${new_body}"; } > "${LIST}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package_versions.txt
+          git add "${LIST}"
           git commit -m "${message}"
           git push origin HEAD:dev
           git diff HEAD~1 --stat
-          echo "changed=${changed}" >> "${GITHUB_OUTPUT}"
+          echo "changed_${BRANCH}=${changed}" >> "${GITHUB_OUTPUT}"
 
-  publish:
-    name: Build, scan, publish
+  # One publish job per channel. !cancelled() lets one channel publish even if
+  # the other channel's check failed.
+  publish-dev:
+    name: Build, scan, publish (dev)
     needs: check
-    if: needs.check.outputs.changed == 'true'
+    if: ${{ !cancelled() && needs.check.outputs.changed_dev == 'true' }}
     permissions:
       contents: read
       packages: write
     uses: ./.github/workflows/build-image.yml
+    with:
+      branch: dev
+
+  publish-latest:
+    name: Build, scan, publish (latest)
+    needs: check
+    if: ${{ !cancelled() && needs.check.outputs.changed_main == 'true' }}
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/build-image.yml
+    with:
+      branch: main
