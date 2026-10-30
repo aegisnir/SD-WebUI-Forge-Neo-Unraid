@@ -197,7 +197,7 @@ Before you start, make sure you have:
 | Requirement | Details |
 |---|---|
 | **Unraid** | Built and used on Unraid 7.3.4. Older versions may work if the NVIDIA Driver plugin offers driver 580 or newer for them. |
-| **NVIDIA GPU** | Turing architecture or newer (RTX 20-series, GTX 16-series, or later). Maxwell, Pascal, and Volta are no longer supported by CUDA 13. |
+| **NVIDIA GPU** | Turing architecture or newer (RTX 20-series, GTX 16-series, or later). Maxwell, Pascal, and Volta are no longer supported by CUDA 13. On RTX 20 / GTX 16 cards, Forge Neo prefers PyTorch 2.10 and prints a version warning; this image ships 2.14 for every card, and that combination is untested. Built and tested on an RTX 4090. |
 | **NVIDIA driver** | **≥ 580** on the host (CUDA 13.0 requirement). Install the [Nvidia-Driver plugin](https://forums.unraid.net/topic/98978-plugin-nvidia-driver/) from Community Applications if you have not already. |
 | **Disk space** | The image itself is large (Python, PyTorch and CUDA libraries are built in), so leave room in your Docker storage. On the path you map to `/data`, plan for models: a single model can be 2–7 GB. SSD storage is strongly recommended. |
 | **RAM** | 16 GB minimum for basic SD 1.5 workflows. 32 GB+ recommended for SDXL or heavy extension use. |

@@ -60,6 +60,29 @@
 #    resets extension packages without touching the image.
 # ------------------------------------------------------------------------------
 
+# ------------------------------------------------------------------------------
+# Versions shared by both stages. Build arguments declared before the first
+# FROM are global; each stage re-declares the ones it uses (ARG NAME, without
+# a value) to read them. Declared inside one stage, the other stage would get
+# an empty value (that broke the banner's Neo version and the torch check once).
+# ------------------------------------------------------------------------------
+# Forge Neo release to build. This must be the commit SHA of a release tag
+# (https://github.com/Haoming02/sd-webui-forge-classic/tags), not a branch.
+# The update-neo workflow bumps both values together.
+#
+# Security note:
+# Avoid passing secrets through build arguments. Industry guidance generally
+# treats build args as poor places for sensitive values because they may show up
+# in build metadata, layer history, logs, or external attestations depending on
+# how and where the image is built.
+ARG WEBUI_TAG=2.31
+ARG WEBUI_REF=c358e55deace6a086af0a547026652ef36daa9c4
+
+# PyTorch build Neo installs by default (modules/launch_utils.py, prepare_environment).
+ARG TORCH_VERSION=2.14.0+cu130
+ARG TORCHVISION_VERSION=0.29.0+cu130
+ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cu130
+
 # uv is only used during the build, to install Python and packages quickly.
 FROM ghcr.io/astral-sh/uv:0.13.6@sha256:af22a52f5eafef3d78e551599d405c02df61919d18028f0cea8eda93bc9986d0 AS uv
 
@@ -78,26 +101,16 @@ SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 # ------------------------------------------------------------------------------
 ARG DEBIAN_FRONTEND=noninteractive
 
-# Forge Neo release to build. This must be the commit SHA of a release tag
-# (https://github.com/Haoming02/sd-webui-forge-classic/tags), not a branch.
-# The update-neo workflow bumps both values together.
-#
-# Security note:
-# Avoid passing secrets through build arguments. Industry guidance generally
-# treats build args as poor places for sensitive values because they may show up
-# in build metadata, layer history, logs, or external attestations depending on
-# how and where the image is built.
-ARG WEBUI_TAG=2.31
-ARG WEBUI_REF=c358e55deace6a086af0a547026652ef36daa9c4
+ARG WEBUI_TAG
+ARG WEBUI_REF
 
 # Python minor version Neo targets (modules/launch_utils.py warns below 3.13).
 # The exact patch release is whatever the pinned uv version installs for 3.13.
 ARG PYTHON_VERSION=3.13
 
-# PyTorch build Neo installs by default (modules/launch_utils.py, prepare_environment).
-ARG TORCH_VERSION=2.14.0+cu130
-ARG TORCHVISION_VERSION=0.29.0+cu130
-ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cu130
+ARG TORCH_VERSION
+ARG TORCHVISION_VERSION
+ARG TORCH_INDEX_URL
 
 # Packages Neo installs outside requirements.txt (same file, same function).
 # SECURITY MITIGATION, MAY BREAK: Neo 2.31 pins gradio 4.40.0, which has 28

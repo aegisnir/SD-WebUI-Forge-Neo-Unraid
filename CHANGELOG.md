@@ -12,6 +12,11 @@ I am keeping this intentionally lightweight. This is a personal, AI-assisted hob
 - **Crash loop on first start:** Forge Neo unpacks its bundled tokenizer files into its own program folder on first start, which is read-only in this image (`OSError: [Errno 30] Read-only file system`). The build now unpacks them, and checks their SHA-256 using Neo's own code.
 - **Built-in preprocessor packages installed at startup instead of build time:** Neo skips all extension installers when `<data-dir>/extensions` doesn't exist, so the build never installed the ControlNet preprocessor packages and they were downloaded into `/data/python-user` on first start. The build now creates that folder, so they are baked in and covered by the image scan.
 
+### Fixed (after the launch-options test on Aether, 2026-10-29)
+
+- **Version values lost in the runtime stage:** after the two-stage split, `WEBUI_TAG`, `WEBUI_REF` and the torch versions were only defined in the build stage. The banner showed "Forge Neo unknown", the image's upstream labels were empty, and the startup torch version check compared against nothing. They are now global build arguments shared by both stages.
+- **Startup's "known harmless messages" list rewritten** from real Forge Neo 2.31 logs. Removed A1111-era entries (CivitAI Shortcut, CivitAI Browser+, the old no-model message). Added Neo's Gradio version warning (expected here; its "delete the venv folder" advice does not apply), Gradio's `share=True` hint (public links are blocked on purpose), Neo's `--cuda-malloc` hint, and Neo's real no-model message, each with an inline note in the log.
+
 ### Added (template: launch options)
 
 - **Launch options instead of a flag string.** About 40 Forge Neo flags are template options (dropdowns), common ones visible and the rest under "Show more settings" (`NEO_*` variables). Defaults match Forge Neo (all off), except two maintainer's choices: extension installs from the WebUI and `--cuda-malloc` (Neo's own RTX recommendation), both on.

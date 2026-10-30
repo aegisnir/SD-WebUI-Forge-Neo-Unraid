@@ -682,22 +682,23 @@ print_launch_notice() {
   fi
 
   echo ""
+  # Messages seen in real Forge Neo 2.31 logs from this image. Each one also
+  # gets an inline [NOTE] where it appears (monitor_webui_output below).
   echo "  ${ACCENT}Known harmless messages you may see in the log below:${RESET}"
-  echo "  ${ACCENT}▸ 'FutureWarning: Importing from timm.models.layers'${RESET}"
-  echo "    ${INFO}→ Upstream library deprecation notice. Safe to ignore.${RESET}"
-  echo "  ${ACCENT}▸ 'UserWarning: TypedStorage is deprecated'${RESET}"
-  echo "    ${INFO}→ Internal PyTorch notice. Safe to ignore.${RESET}"
-  echo "  ${ACCENT}▸ 'FutureWarning: resume_download is deprecated'${RESET}"
-  echo "    ${INFO}→ huggingface_hub deprecation notice during model or extension loading. Safe to ignore.${RESET}"
-  echo "  ${ACCENT}▸ '[ERROR]: Config states .../civitai_subfolders.json, \"created_at\" does not exist'${RESET}"
-  echo "    ${INFO}→ CivitAI Shortcut extension schema notice. Safe to ignore.${RESET}"
-  echo "  ${ACCENT}▸ 'CivitAI Browser+: Basemodel fetch error'${RESET}"
-  echo "    ${INFO}→ CivitAI network API call failed at startup. Safe to ignore; retried on demand.${RESET}"
-  echo "  ${ACCENT}▸ 'Stable diffusion model failed to load' (only when no checkpoint exists)${RESET}"
-  echo "    ${WARN}→ Expected until a model is placed in /data/models/Stable-diffusion/.${RESET}"
+  echo "  ${ACCENT}▸ 'You are running Gradio 4.44.1, while this program was built on Gradio 4.40.0'${RESET}"
+  echo "    ${INFO}→ Expected: this image upgrades Gradio for security (see README).${RESET}"
+  echo "    ${INFO}  Ignore its 'delete the venv folder' advice: there is no venv here.${RESET}"
+  echo "  ${ACCENT}▸ 'To create a public link, set \`share=True\` in \`launch()\`.'${RESET}"
+  echo "    ${INFO}→ Gradio's standard line. Public links are blocked in this container on purpose.${RESET}"
+  echo "  ${ACCENT}▸ 'Hint: your device supports --cuda-malloc'${RESET}"
+  echo "    ${INFO}→ Only when CUDA malloc is off. Turn it on in the template if you want it.${RESET}"
+  echo "  ${ACCENT}▸ 'You do not have any model... Please download models to \"models/Stable-diffusion\"'${RESET}"
+  echo "    ${WARN}→ Expected until a model is in /data/models/Stable-diffusion/.${RESET}"
   echo "  ${ACCENT}▸ 'ERROR: Exception in ASGI application' with 'WebSocketDisconnect: 1001'${RESET}"
   echo "    ${INFO}→ Browser dropped its WebSocket when the server shut down (Restart / stop).${RESET}"
   echo "    ${INFO}  Code 1001 = 'Going Away' -- the normal browser close. Not a real error.${RESET}"
+  echo "  ${ACCENT}▸ Lines from extensions you installed${RESET}"
+  echo "    ${INFO}→ Those come from the extension, not Forge Neo or this container.${RESET}"
   echo ""
   echo "  ${INFO}Inline notes marked [NOTE] or [KNOWN WARNING] are added by this container${RESET}"
   echo "  ${INFO}and are not part of the upstream WebUI output.${RESET}"
@@ -733,9 +734,25 @@ monitor_webui_output() {
       echo "  ${C_INFO}[NOTE] ↑ Harmless internal PyTorch deprecation notice. Safe to ignore.${C_RESET}"
     fi
 
-    # CivitAI Shortcut 'created_at' schema notice -- shows as [ERROR] but is harmless
-    if [[ "${line}" == *"Config states"* && "${line}" == *'"created_at" does not exist'* ]]; then
-      echo "  ${C_INFO}[NOTE] ↑ CivitAI Shortcut extension schema notice. Safe to ignore.${C_RESET}"
+    # Neo's version check: expected, this image ships Gradio 4.44.1 on purpose.
+    # Its advice to delete the venv folder doesn't apply (there is no venv).
+    if [[ "${line}" == "Delete the venv folder to do a reinstall is recommended."* ]]; then
+      echo "  ${C_INFO}[NOTE] ↑ Expected: this image upgrades Gradio for security. There is no venv here; nothing to delete.${C_RESET}"
+    fi
+
+    # Gradio prints this on every launch; --share is blocked in this container.
+    if [[ "${line}" == "To create a public link, set \`share=True\`"* ]]; then
+      echo "  ${C_INFO}[NOTE] ↑ Gradio's standard line. Public links are blocked here on purpose.${C_RESET}"
+    fi
+
+    # Neo suggests --cuda-malloc on RTX cards when it is off.
+    if [[ "${line}" == *"Hint: your device supports --cuda-malloc"* ]]; then
+      echo "  ${C_INFO}[NOTE] ↑ Optional. Set CUDA malloc to true in the template to use it.${C_RESET}"
+    fi
+
+    # Neo's message when no checkpoint exists.
+    if [[ "${line}" == *"You do not have any model..."* ]]; then
+      echo "  ${C_WARN}[NOTE] ↑ Expected until a model is in /data/models/Stable-diffusion/ on your Data (or Models) directory.${C_RESET}"
     fi
 
     # Uvicorn WebSocket disconnect on graceful shutdown (Restart button / container stop).
@@ -787,22 +804,26 @@ monitor_webui_output() {
 # Runs completely outside the log monitor so it is not affected by log content
 # or Gradio version changes. Uses bash's built-in /dev/tcp -- no external tools.
 _poll_for_ready() {
+  # The WebUI always listens on 7860 inside the container (neo_args.py).
+  # The port on the server is the template's WebUI mapping, which the
+  # container can't see, so the box says so.
   local _port="7860"
-  # Extract --port value from COMMANDLINE_ARGS if the user overrode the default.
-  # Handles both space-separated (--port 7861) and equals-separated (--port=7861) forms.
-  if [[ "${COMMANDLINE_ARGS:-}" =~ --port[[:space:]]+([0-9]+) ]]; then
-    _port="${BASH_REMATCH[1]}"
-  elif [[ "${COMMANDLINE_ARGS:-}" =~ --port=([0-9]+) ]]; then
-    _port="${BASH_REMATCH[1]}"
-  fi
 
   # Determine the URL host -- checked in order:
-  #   1. WEBUI_HOST_IP env var (explicit override; required in bridge/NAT mode)
-  #   2. Container's own outbound IP if it is a real LAN address
+  #   1. The first HTTPS Hostnames entry (WEBUI_TLS_HOSTNAMES) when HTTPS is on:
+  #      it is the name the certificate was made for (FQDN first is recommended)
+  #   2. WEBUI_HOST_IP env var (explicit override; required in bridge/NAT mode)
+  #   3. Container's own outbound IP if it is a real LAN address
   #      (macvlan / Unraid br0 / --network=host -- container IP is directly reachable)
-  #   3. Placeholder with hint to set WEBUI_HOST_IP
+  #   4. Placeholder with hint to set WEBUI_HOST_IP
   local _host_ip=""
-  if [[ -n "${WEBUI_HOST_IP:-}" ]]; then
+  if [[ "${TLS_SCHEME}" == "https" && -n "${WEBUI_TLS_HOSTNAMES:-}" ]]; then
+    _host_ip="${WEBUI_TLS_HOSTNAMES%%,*}"
+    _host_ip="${_host_ip//[[:space:]]/}"
+  fi
+  if [[ -n "${_host_ip}" ]]; then
+    :
+  elif [[ -n "${WEBUI_HOST_IP:-}" ]]; then
     _host_ip="${WEBUI_HOST_IP}"
   else
     # Python3 is always available (it runs the WebUI). The UDP connect() resolves the
@@ -837,8 +858,10 @@ _poll_for_ready() {
       fi
       echo ""
       echo "  ${C_ACCENT}${C_BOLD}╭─ [READY] ───────────────────────────────────────────────────────────╮"
-      echo "  │  WebUI is LIVE -- open it in your browser:                           │"
+      echo "  │  WebUI is LIVE -- open it in your browser:                          │"
       printf  "  │  %-67s│\n" "${_url}"
+      echo "  │  (7860 is the port inside the container; if your template's WebUI   │"
+      echo "  │  port is different, use that one.)                                  │"
       echo "  ╰─────────────────────────────────────────────────────────────────────╯${C_RESET}"
       echo ""
       return 0
