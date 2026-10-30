@@ -12,6 +12,10 @@ I am keeping this intentionally lightweight. This is a personal, AI-assisted hob
 - **Crash loop on first start:** Forge Neo unpacks its bundled tokenizer files into its own program folder on first start, which is read-only in this image (`OSError: [Errno 30] Read-only file system`). The build now unpacks them, and checks their SHA-256 using Neo's own code.
 - **Built-in preprocessor packages installed at startup instead of build time:** Neo skips all extension installers when `<data-dir>/extensions` doesn't exist, so the build never installed the ControlNet preprocessor packages and they were downloaded into `/data/python-user` on first start. The build now creates that folder, so they are baked in and covered by the image scan.
 
+### Fixed (layer order)
+
+- **Ubuntu updates no longer re-download the 3.8 GB PyTorch layer.** Docker on the server only reuses a layer when every layer under it is unchanged. The Ubuntu update layer sat *below* the PyTorch layer, so each Ubuntu change forced the PyTorch layer to download again, even though it was identical (seen on Aether on 2026-10-29). The runtime stage now stacks Python/PyTorch and Forge Neo first and the Ubuntu updates after them. The earlier "Staged build" note overstated what `COPY --link` does: it saves rebuilding on GitHub, not downloading on your server.
+
 ### Changed (defaults)
 
 - **Update extensions on start is now on by default** (*maintainer's choice*; Forge Neo's default is off). Every start pulls updates for installed extensions. Set it to `false` to update by hand.

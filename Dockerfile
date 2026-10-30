@@ -13,9 +13,10 @@
 #   - Pin the CUDA base image and the uv build tool by digest
 #   - Pin upstream Forge Neo to a release tag's commit SHA (WEBUI_REF)
 #   - Build in two stages: Python, PyTorch and Forge Neo are prepared in
-#     'build' and copied into the runtime stage with COPY --link, so an
-#     Ubuntu security update does not change (or re-download) the large
-#     Python layer. See README "How updates are published".
+#     'build' and copied into the runtime stage. Layers are stacked from
+#     least to most often changing (Python, Neo, then Ubuntu updates), because
+#     Docker only reuses a downloaded layer when every layer under it is
+#     unchanged. See README "How updates are published".
 #
 # This project is maintained as a personal, AI-assisted hobby project.
 # These comments try to explain the reasoning behind the current choices,
@@ -308,6 +309,20 @@ ARG APP_UID=99
 ARG APP_GID=100
 
 # ------------------------------------------------------------------------------
+# Python (with PyTorch and every WebUI package) and Forge Neo, from the build
+# stage, as the FIRST layers on top of the base image. Docker on the server
+# only reuses a downloaded layer when every layer under it is unchanged, so
+# the large, rarely changing layers go at the bottom and the daily Ubuntu
+# updates go above them. Otherwise every Ubuntu update would re-download the
+# 3.8 GB Python layer. --link keeps their digests stable across builds;
+# --chown sets ownership while copying (a separate chown -R would store Neo's
+# whole folder a second time). Numeric IDs: the user is created further down.
+# ------------------------------------------------------------------------------
+COPY --link --from=build /opt/python /opt/python
+COPY --link --chown=${APP_UID}:${APP_GID} --from=build /opt/forge-neo /opt/forge-neo
+
+
+# ------------------------------------------------------------------------------
 # Runtime defaults
 # NOTE: --listen binds to all interfaces. On a trusted LAN this is often OK,
 # but exposing this service beyond a trusted network may not be as safe as intended.
@@ -339,9 +354,9 @@ ENV APP_GID="${APP_GID}"
 # pick up updates. https://docs.docker.com/build/building/best-practices/
 # ------------------------------------------------------------------------------
 # APT_REFRESH: the build workflows pass today's date (US Eastern), so this
-# layer is rebuilt once a day with current Ubuntu security updates. The
-# Python and Forge Neo layers below are COPY --link layers: they do not
-# depend on this one and are reused unchanged.
+# layer is rebuilt once a day with current Ubuntu security updates. It sits
+# above the Python and Forge Neo layers, so a change here never makes the
+# server download those again.
 ARG APT_REFRESH=none
 RUN echo "apt refresh: ${APT_REFRESH}" \
   && apt-get update \
@@ -379,15 +394,6 @@ RUN set -eux; \
   useradd --uid "${APP_UID}" --gid "${APP_GID}" --create-home --shell /bin/bash sdwebui; \
   fi
 
-# ------------------------------------------------------------------------------
-# Python (with PyTorch and every WebUI package) and Forge Neo, from the build
-# stage. --link makes each a self-contained layer: it keeps the same digest
-# whatever changes in the layers before it, so Unraid only downloads it again
-# when its own contents change. --chown sets ownership while copying (a
-# separate chown -R would store Neo's whole folder a second time).
-# ------------------------------------------------------------------------------
-COPY --link --from=build /opt/python /opt/python
-COPY --link --chown=${APP_UID}:${APP_GID} --from=build /opt/forge-neo /opt/forge-neo
 # The interpreter path was recorded in the build stage.
 RUN py="$(cat /opt/python/.python3-path)" \
   && test -x "${py}" \
