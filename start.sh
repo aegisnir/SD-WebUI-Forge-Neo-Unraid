@@ -557,7 +557,7 @@ _tls_san_list() {
       sans+=("DNS:${name}")
     else
       echo "${C_CRIT}${C_BOLD}ERROR:${C_RESET}${C_CRIT} WEBUI_TLS_HOSTNAMES has an invalid entry: ${name}${C_RESET}" >&2
-      echo "${C_WARN}       Use comma-separated hostnames or IPv4 addresses, for example: aether.local,10.0.0.5${C_RESET}" >&2
+      echo "${C_WARN}       Use comma-separated hostnames or IPv4 addresses, for example: myserver.example.com,192.168.1.10${C_RESET}" >&2
       exit 1
     fi
   done

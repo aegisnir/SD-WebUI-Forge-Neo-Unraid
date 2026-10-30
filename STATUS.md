@@ -90,24 +90,24 @@
 ## In Progress
 
 - Forge Neo rebase: first image built, passed the Trivy gate, and published as `:dev` (2026-10-29).
-  Next: the Aether test (checklist in the maintainer's vault note).
+  Next: the test on the maintainer's server (checklist in the maintainer's vault note).
 
 ## Remaining
 
-- Test on Aether as a second container on port 7861 with a separate test data folder and one
+- Test on the maintainer's server as a second container on port 7861 with a separate test data folder and one
   copied checkpoint: login, one image, Restart button, one extension, clean logs, login lockout,
   speed vs the old xformers setup.
 - Watch the first nightly update check (`check-updates.yml`, 4 AM ET) and the first build with the
   registry cache: the second build after it should reuse the PyTorch layer.
-- Optional: split the PyTorch layer into several smaller layers (needs a fixed Python install path),
-  so a dropped download only retries one piece.
-- Test the launch options on Aether: re-download the template and re-create the container from
+- Verify the 10-way Python layer split on the maintainer's server: the first pull downloads all 10 pieces once; on the
+  next update they should all say "Already exists".
+- Test the launch options on the maintainer's server: re-download the template and re-create the container from
   it (Unraid doesn't add new template fields to an existing container); check the log for the
   removed-flag notes and that CUDA malloc is on.
 - After the first build works: switch the base image to plain `ubuntu:24.04` (digest-pinned).
   Ubuntu 22.04 standard support ends April 2027, and the `nvidia/cuda` base duplicates the CUDA
   libraries the torch wheels already install. Set `NVIDIA_VISIBLE_DEVICES` and
-  `NVIDIA_DRIVER_CAPABILITIES` in the Dockerfile (the CUDA image set them), then re-test on Aether.
+  `NVIDIA_DRIVER_CAPABILITIES` in the Dockerfile (the CUDA image set them), then re-test on the maintainer's server.
 - Decide on optional TOTP 2FA and the two Forge Neo build-time patches (XSS escape, safetensors
   header size cap).
 - Re-run fresh install, persistence, and read-only smoke tests before promoting `:latest`.

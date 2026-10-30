@@ -289,6 +289,29 @@ RUN rm -rf "${WEBUI_DIR}/tmp" "${WEBUI_DIR}/config_states" \
   && test ! -e "${WEBUI_DIR}/extensions-builtin/sd_forge_spectrum/presets.json" \
   && ln -s /config/webui/spectrum-presets.json "${WEBUI_DIR}/extensions-builtin/sd_forge_spectrum/presets.json"
 
+# ------------------------------------------------------------------------------
+# Split /opt/python (about 3.8 GB compressed) into 10 groups of roughly equal
+# size, each copied into the runtime stage as its own layer. One layer that
+# large kept getting cut off mid-download on slow or unstable connections;
+# ten smaller ones download in parallel and a drop only retries one piece.
+# scripts/split-layers.py breaks large folders (torch, nvidia, ...) into
+# their entries and places pieces largest first with a fixed tie-break, so
+# unchanged packages produce the same layers build after build. Each piece
+# is moved to /opt/split/<n>/<its original path>, so the layers unpack back
+# into /opt/python. This must stay the last step of the build stage: Python
+# itself is moved. The build fails if any file is left behind.
+# ------------------------------------------------------------------------------
+COPY scripts/split-layers.py /tmp/split-layers.py
+# SC3045: read -d is bash, and SHELL above makes every RUN use bash.
+# hadolint ignore=SC3045
+RUN python3 /tmp/split-layers.py /opt/python 10 > /tmp/split.plan \
+  && for i in 0 1 2 3 4 5 6 7 8 9; do mkdir -p "/opt/split/${i}"; done \
+  && while IFS=$'\t' read -r -d '' i p; do \
+  d="/opt/split/${i}$(dirname "${p}")"; mkdir -p "${d}"; mv "${p}" "${d}/"; \
+  done < /tmp/split.plan \
+  && test -z "$(find /opt/python \( -type f -o -type l \) -print -quit)" \
+  && rm -f /tmp/split.plan /tmp/split-layers.py
+
 # ==============================================================================
 # Runtime stage
 # ==============================================================================
@@ -309,8 +332,9 @@ ARG APP_UID=99
 ARG APP_GID=100
 
 # ------------------------------------------------------------------------------
-# Python (with PyTorch and every WebUI package) and Forge Neo, from the build
-# stage, as the FIRST layers on top of the base image. Docker on the server
+# Python (with PyTorch and every WebUI package; split into 10 layers, see the
+# end of the build stage) and Forge Neo, from the build stage, as the FIRST
+# layers on top of the base image. Docker on the server
 # only reuses a downloaded layer when every layer under it is unchanged, so
 # the large, rarely changing layers go at the bottom and the daily Ubuntu
 # updates go above them. Otherwise every Ubuntu update would re-download the
@@ -318,7 +342,16 @@ ARG APP_GID=100
 # --chown sets ownership while copying (a separate chown -R would store Neo's
 # whole folder a second time). Numeric IDs: the user is created further down.
 # ------------------------------------------------------------------------------
-COPY --link --from=build /opt/python /opt/python
+COPY --link --from=build /opt/split/0/ /
+COPY --link --from=build /opt/split/1/ /
+COPY --link --from=build /opt/split/2/ /
+COPY --link --from=build /opt/split/3/ /
+COPY --link --from=build /opt/split/4/ /
+COPY --link --from=build /opt/split/5/ /
+COPY --link --from=build /opt/split/6/ /
+COPY --link --from=build /opt/split/7/ /
+COPY --link --from=build /opt/split/8/ /
+COPY --link --from=build /opt/split/9/ /
 COPY --link --chown=${APP_UID}:${APP_GID} --from=build /opt/forge-neo /opt/forge-neo
 
 

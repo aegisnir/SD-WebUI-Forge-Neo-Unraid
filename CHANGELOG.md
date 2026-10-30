@@ -7,20 +7,24 @@ I am keeping this intentionally lightweight. This is a personal, AI-assisted hob
 
 ## [Unreleased]
 
-### Fixed (first Aether test, 2026-10-29)
+### Fixed (first test on the maintainer's server, 2026-10-29)
 
 - **Crash loop on first start:** Forge Neo unpacks its bundled tokenizer files into its own program folder on first start, which is read-only in this image (`OSError: [Errno 30] Read-only file system`). The build now unpacks them, and checks their SHA-256 using Neo's own code.
 - **Built-in preprocessor packages installed at startup instead of build time:** Neo skips all extension installers when `<data-dir>/extensions` doesn't exist, so the build never installed the ControlNet preprocessor packages and they were downloaded into `/data/python-user` on first start. The build now creates that folder, so they are baked in and covered by the image scan.
 
+### Changed (download size per layer)
+
+- **The 3.8 GB Python/PyTorch layer is split into 10 layers of roughly 400 MB.** On the maintainer's server a single 3.8 GB layer kept getting cut off mid-download on a congested connection until Docker gave up (`unexpected EOF`). `scripts/split-layers.py` sorts the Python install's folders (large ones broken into subfolders) into 10 equally sized groups, biggest first with a fixed tie-break, and each group is copied as its own layer. They unpack into the same folder, so nothing changes inside the container. The build fails if a file is left behind.
+
 ### Fixed (layer order)
 
-- **Ubuntu updates no longer re-download the 3.8 GB PyTorch layer.** Docker on the server only reuses a layer when every layer under it is unchanged. The Ubuntu update layer sat *below* the PyTorch layer, so each Ubuntu change forced the PyTorch layer to download again, even though it was identical (seen on Aether on 2026-10-29). The runtime stage now stacks Python/PyTorch and Forge Neo first and the Ubuntu updates after them. The earlier "Staged build" note overstated what `COPY --link` does: it saves rebuilding on GitHub, not downloading on your server.
+- **Ubuntu updates no longer re-download the 3.8 GB PyTorch layer.** Docker on the server only reuses a layer when every layer under it is unchanged. The Ubuntu update layer sat *below* the PyTorch layer, so each Ubuntu change forced the PyTorch layer to download again, even though it was identical (seen on the maintainer's server on 2026-10-29). The runtime stage now stacks Python/PyTorch and Forge Neo first and the Ubuntu updates after them. The earlier "Staged build" note overstated what `COPY --link` does: it saves rebuilding on GitHub, not downloading on your server.
 
 ### Changed (defaults)
 
 - **Update extensions on start is now on by default** (*maintainer's choice*; Forge Neo's default is off). Every start pulls updates for installed extensions. Set it to `false` to update by hand.
 
-### Fixed (after the launch-options test on Aether, 2026-10-29)
+### Fixed (after the launch-options test, 2026-10-29)
 
 - **Version values lost in the runtime stage:** after the two-stage split, `WEBUI_TAG`, `WEBUI_REF` and the torch versions were only defined in the build stage. The banner showed "Forge Neo unknown", the image's upstream labels were empty, and the startup torch version check compared against nothing. They are now global build arguments shared by both stages.
 - **Startup's "known harmless messages" list rewritten** from real Forge Neo 2.31 logs. Removed A1111-era entries (CivitAI Shortcut, CivitAI Browser+, the old no-model message). Added Neo's Gradio version warning (expected here; its "delete the venv folder" advice does not apply), Gradio's `share=True` hint (public links are blocked on purpose), Neo's `--cuda-malloc` hint, and Neo's real no-model message, each with an inline note in the log.
@@ -48,7 +52,7 @@ I am keeping this intentionally lightweight. This is a personal, AI-assisted hob
 
 - The login page now shows the lockout rule above the form (Gradio's `auth_message`), because Gradio can only answer "Incorrect credentials", even for a locked username.
 
-### Fixed (UI half-loaded on first Aether test, 2026-10-29)
+### Fixed (UI half-loaded on the first test, 2026-10-29)
 
 - **Built-in Spectrum extension failed to load:** it creates `presets.json` in its own folder on first load (read-only here). That file is now a link to `/config/webui/spectrum-presets.json`, so presets are saved in appdata.
 - **403 on all of Neo's scripts and styles:** Neo only lets Gradio serve files from its data folder, which by default is its program folder. This image moves data to `/data`, so the program files fell off the list. `start.sh` now adds `--gradio-allowed-path` for exactly what the browser loads: `script.js`, `style.css`, `javascript/`, `html/` and `extensions-builtin/` (narrower than upstream, which allows its whole folder).
