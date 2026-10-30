@@ -89,17 +89,20 @@
 
 ## In Progress
 
-- Forge Neo rebase: published as `:dev` and running on the maintainer's server (2026-10-30). Working:
-  login and lockout message, HTTPS, image generation, Restart button, extension install, launch
-  options (CUDA malloc on, extension auto-update on), Spectrum Integrated, the 10-way layer split
-  (first pull completed in pieces).
+- Forge Neo rebase: published as `:dev` and running on the maintainer's server (2026-10-30, image
+  `fb10561`). Working: login and lockout message, HTTPS, image generation, Restart button, extension
+  install, launch options (CUDA malloc on, extension auto-update on), Spectrum Integrated, the 10-way
+  layer split. Old A1111/Forge flags in Extra Launch Flags are now removed with a note instead of
+  stopping Neo.
+- Nightly update check: first run (started by hand, 2026-10-30) passed, committed
+  `package_versions.txt` and published `:dev`. The registry build cache cut the next build to 8 minutes.
 
 ## Remaining
 
-- Nightly update check (`check-updates.yml`): has not run yet (no scheduled run on 2026-10-30;
-  GitHub delays scheduled runs under load). Run it once by hand to create `package_versions.txt`,
-  then confirm the scheduled run fires.
-- On the next published update: every Python layer and the Neo layer should say "Already exists".
+- Confirm the 4 AM ET scheduled run of `check-updates.yml` fires on its own (none ran on 2026-10-30;
+  GitHub delays scheduled runs under load).
+- Confirm on the maintainer's server that the update to `fb10561` reused every Python layer and the
+  Neo layer ("Already exists").
 - Speed: compare CUDA malloc on vs off (batch of 5, fixed seed, run twice), then against the
   previous xformers-based setup.
 - Investigate `driverInitFileInfo 599 result=11` log lines (generation works).
