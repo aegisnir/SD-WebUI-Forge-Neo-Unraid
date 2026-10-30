@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="icon.png" alt="SD-WebUI-Forge-Neo-Unraid logo: a glowing blue-to-pink letter A on a dark circuit pattern" width="160">
+  <img src="icon.png" alt="SD-WebUI-Forge-Neo-Unraid logo: the words FORGE neo in a glowing blue-to-pink gradient on a dark circuit pattern" width="160">
 </p>
 
 # SD-WebUI-Forge-Neo-Unraid
