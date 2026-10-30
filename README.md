@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="icon.png" alt="SD-WebUI-Forge-Neo-Unraid logo: a glowing blue-to-pink letter A on a dark circuit pattern" width="160">
+</p>
+
 # SD-WebUI-Forge-Neo-Unraid
 
 **[Forge Neo](https://github.com/Haoming02/sd-webui-forge-classic/tree/neo) by Haoming02, packaged for Unraid by Aegisnir.**
