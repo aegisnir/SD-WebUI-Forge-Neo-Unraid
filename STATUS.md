@@ -96,13 +96,12 @@
   stopping Neo.
 - Nightly update check: first run (started by hand, 2026-10-30) passed, committed
   `package_versions.txt` and published `:dev`. The registry build cache cut the next build to 8 minutes.
+- Layer reuse confirmed: the update to `fb10561` on the maintainer's server took about 3 seconds.
 
 ## Remaining
 
 - Confirm the 4 AM ET scheduled run of `check-updates.yml` fires on its own (none ran on 2026-10-30;
   GitHub delays scheduled runs under load).
-- Confirm on the maintainer's server that the update to `fb10561` reused every Python layer and the
-  Neo layer ("Already exists").
 - Speed: compare CUDA malloc on vs off (batch of 5, fixed seed, run twice), then against the
   previous xformers-based setup.
 - Investigate `driverInitFileInfo 599 result=11` log lines (generation works).
