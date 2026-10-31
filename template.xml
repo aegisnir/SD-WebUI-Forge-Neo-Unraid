@@ -61,21 +61,34 @@
     The image includes a Docker HEALTHCHECK that probes port 7860. It uses generous timers (5 min start grace, 5 retries) to avoid false positives during model loading or heavy extension operations. Unhealthy status is informational only and does not auto-restart the container.
   </Description>
   <Overview>
-  Image: ghcr.io/aegisnir/sd-webui-forge-neo-unraid:dev
-  Extra Parameters (advanced view) hold --runtime=nvidia (the GPU) and the security options; each is explained in the Description and the README.
-  Full setup and usage docs: https://github.com/aegisnir/sd-webui-forge-neo-unraid/blob/dev/README.md
+  Forge Neo (Stable Diffusion WebUI) by Haoming02, packaged for Unraid by Aegisnir with security hardening.
+  Requires an NVIDIA GPU and the Nvidia Driver plugin.
 
-    This template passes Forge Neo data storage through --data-dir.
+  FIRST LOGIN
+  - The first start creates user admin with a random password, printed ONCE in the container log after the [READY] box. Save it right away.
+  - Logins are saved in auth/webui-auth.txt in the Config Directory, one username:password per line. Open that file to see or change a password, or add a line to add another user. Don't use : or , in usernames or passwords. Restart the container to apply any change.
+  - If that file already exists (for example, after a reinstall), no new password is made and no login box appears. Your existing login still works.
+  - Setting your own --gradio-auth or --gradio-auth-path in Extra Launch Flags turns this off.
 
-    - Models, outputs, extensions, caches, and other working data are stored in the mapped data share instead of the container filesystem.
-    - Python, PyTorch and all WebUI dependencies are built into the image, so startup needs no downloads (extensions may still install their own packages).
-    - The data directory can grow very large very quickly, so I recommend storing it outside of appdata when possible.
-    - Launch flags are options in this template (common ones visible, the rest under Show more settings). Anything else goes in Extra Launch Flags.
-    - If startup fails with a Torch GPU check error, you can temporarily add --skip-torch-cuda-test to Extra Launch Flags for troubleshooting.
-    - If an extension breaks torch, delete /data/python-user on the host and restart. It holds only packages installed by extensions.
-    - WebUI login is enabled by default unless you explicitly set your own --gradio-auth or --gradio-auth-path in Extra Launch Flags.
-    - Container logs annotate known harmless warnings inline and display a [READY] box when the WebUI is accepting connections.
-    - A built-in Docker healthcheck monitors port 7860 with conservative timers to avoid false positives during heavy operations.
+  IMAGE TAGS
+  - latest is the stable release and is recommended.
+  - dev gets every change as soon as it builds, so it may break.
+  - You choose the tag at install.
+
+  STORAGE
+  - The Data Directory holds models, outputs, extensions and caches. It grows very large very quickly, so keep it outside appdata.
+  - Python, PyTorch and all WebUI dependencies are built into the image, so startup downloads nothing. Extensions may still install their own packages.
+
+  SETTINGS
+  - Common launch flags are options in this template, with the rest under Show more settings. Anything else goes in Extra Launch Flags.
+  - Extra Parameters (advanced view) hold --runtime=nvidia, which gives the container your GPU, plus the security options. Each one is explained in the Description and the README.
+
+  TROUBLESHOOTING
+  - If startup fails with a Torch GPU check error, temporarily add --skip-torch-cuda-test to Extra Launch Flags.
+  - If an extension breaks torch, delete the python-user folder in your Data Directory and restart. It only holds packages that extensions installed.
+  - The log labels known harmless warnings and shows a [READY] box once the WebUI is up. A Docker healthcheck watches port 7860.
+
+  Full docs: https://github.com/aegisnir/sd-webui-forge-neo-unraid/blob/dev/README.md
   </Overview>
   <Category>AI:</Category>
   <WebUI>https://[IP]:[PORT:7860]</WebUI>
