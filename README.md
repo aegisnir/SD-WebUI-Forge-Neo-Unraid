@@ -50,7 +50,7 @@ I built this container for my own Unraid server and the way I use it, then share
 | Login lockout after **5** failed attempts for **15** minutes | Slows down password guessing | Typos can lock you out for a while | `WEBUI_LOGIN_MAX_ATTEMPTS`, `WEBUI_LOGIN_LOCKOUT_MINUTES` ([details](#login-protection)) |
 | Files in `/data` readable from the host (no strict `UMASK`) | I manage models and images over SMB | Other users and apps on the server can read them | Set `UMASK=0027` ([details](#storage-and-permissions)) |
 | The WebUI restarts itself when it exits | No manual restarts after crashes or "Apply and restart UI" | A crash loop keeps retrying (with growing delays) | `RESTART_ON_EXIT=0` ([details](#automatic-restart)) |
-| Old settings from another WebUI are backed up and replaced automatically | Upgrades just work | You redo your settings once | Restore from the `*.pre-neo-*.bak` files ([details](#what-if-something-goes-wrong)) |
+| Old settings from another WebUI are backed up and replaced automatically | Upgrades just work | You redo your settings once | Restore from the `*.pre-neo-*.bak` files ([details](#if-something-goes-wrong)) |
 | Data folder `/mnt/user/ai/data` in the template | Keeps large files out of appdata | None, if you have an `ai` share | Change the **Data Directory** path in the template |
 
 ---
@@ -168,7 +168,7 @@ Found in a review of Forge Neo 2.31 and not fixed by this container:
 - **Stored XSS in the extra-networks cards** (`modules/ui_extra_networks.py`): model file names and search terms are not escaped. A model with a crafted file name or metadata could run script in your browser. Same pattern as AUTOMATIC1111's CVE-2026-111984.
 - **No size limit when reading `.safetensors` metadata** (`modules/sd_models.py`): a crafted model file can use a lot of memory. Same pattern as AUTOMATIC1111's CVE-2026-111985.
 
-**Can this container fix them?** Both have small, well-understood fixes. Patching Forge Neo's code inside the image is possible, but it means this image no longer runs exactly the upstream code. That is being considered; until then, the safest protection is to only add models from sources you trust. The plan is also to report both upstream.
+**This container doesn't patch them yet.** Both have small, well-understood fixes, but patching Forge Neo's code inside the image means it no longer runs exactly the upstream code. That is being considered. Until then, the safest protection is to only add models from sources you trust. The plan is also to report both upstream.
 
 Forge Neo did remove AUTOMATIC1111's `.yaml` model-config code-execution path (CVE-2026-111986), and it always loads checkpoints with PyTorch's safer `weights_only=True` mode.
 
@@ -288,7 +288,7 @@ Running on local URL: https://localhost:7860
 
 A `[READY]` box appears once the WebUI accepts connections. If the container finds no model, it says so before launch. That is **normal**. See [Getting Your First Model](#getting-your-first-model).
 
-### What if something goes wrong?
+### If something goes wrong
 
 - Extensions can install their own Python packages on start. Those go to `/data/python-user`, never into the image. If an extension breaks things (for example by installing a different PyTorch), delete that folder on the host and restart. The container checks the PyTorch version on every start and tells you when this happens.
 - If you reuse settings from an older WebUI (for example AUTOMATIC1111), Forge Neo cannot use them. The container moves `config.json` and `ui-config.json` aside as dated backups (`*.pre-neo-<date>.bak`, in the appdata `webui/` folder), starts with default settings, and says so in the log. Nothing is deleted.
@@ -393,7 +393,7 @@ The container uses two main mount points. Here is where everything lives:
 └── tmp/                          Temporary files (cleaned on start)
 ```
 
-**Why two paths?** `/config` holds small configuration files that belong in your appdata backup. `/data` holds large, fast-growing content (models, outputs, extensions) that should live on a drive with plenty of space, preferably an SSD.
+**The two paths are separate on purpose.** `/config` holds small configuration files that belong in your appdata backup. `/data` holds large, fast-growing content (models, outputs, extensions) that should live on a drive with plenty of space, preferably an SSD.
 
 ### Optional: separate Models and Outputs folders
 
@@ -425,9 +425,9 @@ This container enables the WebUI login page by default. The API is disabled by d
 
 Change this as soon as possible after first login.
 
-**Forgot your password?** Delete the auth file and restart the container. A new password is generated and shown in the log.
+**If you forget your password**, open the auth file: it's saved there. To get a new random one instead, delete the auth file and restart the container. The new password is shown once in the log.
 
-Upgrading from an older version? An existing auth file is never changed. If it still uses the old default password, the log keeps warning until you change it.
+**An existing auth file is never changed.** Reinstalling or upgrading with the same Config Directory creates no new password and shows no login box, so your existing login keeps working. If the file still uses the old default password from an older version, the log keeps warning until you change it.
 
 **Auth file location:**
 
@@ -450,7 +450,9 @@ admin:replace-with-strong-password
 viewer:another-password
 ```
 
-Lines starting with `#` are comments. Blank lines are ignored.
+Lines starting with `#` are comments. Blank lines are ignored. Each `username:password` entry is its own login, so add an entry to add a user. Usernames and passwords can't contain `:` or `,`, because those separate the entries.
+
+Restart the container after editing the file. Startup reads it once, so changes take effect on the next start.
 
 > [!TIP]
 > **More detail below:** click **Auth file details: permissions, SMB access, API mirroring** to expand it.
@@ -507,7 +509,7 @@ Gradio's login page has no limit on password guesses. This container adds one. I
 - Passwords are compared in constant time, so response timing reveals nothing.
 - The login page shows a line above the form stating the limit (for example *"5 failed logins lock that username for 15 minutes. Restarting the container clears it."*). Gradio's login page can only say "Incorrect credentials", so a locked username gets that same message; the line above the form is how you know a lockout is possible.
 
-**Locked yourself out?** Restart the container. Lockouts are kept in memory only, so a restart clears them all. Or wait out the lockout time.
+**If you lock yourself out**, restart the container. Lockouts are kept in memory only, so a restart clears them all. You can also wait out the lockout time.
 
 **Limits:** it locks per username, not per device, because Gradio does not tell the login check who is connecting. Someone guessing can therefore lock *your* username for a while (a nuisance, not a break-in). It does not cover the separate API login (`--api-auth`). Set `WEBUI_LOGIN_MAX_ATTEMPTS=0` to turn it off.
 
@@ -664,7 +666,7 @@ This container uses the WebUI's `--data-dir` so the large, fast-growing working 
 | Container path | `/data` |
 | Default host path | `/mnt/user/ai/data/` |
 
-**Why not `/appdata`?** This directory can grow very large very quickly with models, outputs, extensions, and caches. If you store it in `appdata`, it may fill that area much faster than expected, especially if your Docker-related storage is limited. You can absolutely use `appdata` if that fits your setup, just be aware of the growth.
+**It's best kept outside `appdata`.** This directory can grow very large very quickly with models, outputs, extensions, and caches. If you store it in `appdata`, it may fill that area much faster than expected, especially if your Docker-related storage is limited. You can absolutely use `appdata` if that fits your setup, just be aware of the growth.
 
 The Python environment is part of the image, not `/data`. Only packages that extensions install live in `/data/python-user`.
 
