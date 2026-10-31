@@ -4,10 +4,13 @@
 # IMPORTANT:
 # - The password below was generated randomly on first launch.
 # - It was shown once in the container log. Replace it with your own.
-# - Forgot it? Delete this file and restart: a new one is generated.
+# - To get a new random password, delete this file and restart.
 #
 # Format:
 # - one credential per line as username:password
 # - or multiple comma-separated credentials on one line
 # - blank lines and lines starting with # are ignored
+# - each username:password entry is its own login, so add one to add a user
+# - usernames and passwords can't contain : or ,
+# - restart the container after editing to apply changes
 

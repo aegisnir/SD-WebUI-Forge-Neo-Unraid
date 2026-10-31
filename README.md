@@ -425,9 +425,9 @@ This container enables the WebUI login page by default. The API is disabled by d
 
 Change this as soon as possible after first login.
 
-**Forgot your password?** Delete the auth file and restart the container. A new password is generated and shown in the log.
+**If you forget your password**, open the auth file: it's saved there. To get a new random one instead, delete the auth file and restart the container. The new password is shown once in the log.
 
-Upgrading from an older version? An existing auth file is never changed. If it still uses the old default password, the log keeps warning until you change it.
+**An existing auth file is never changed.** Reinstalling or upgrading with the same Config Directory creates no new password and shows no login box, so your existing login keeps working. If the file still uses the old default password from an older version, the log keeps warning until you change it.
 
 **Auth file location:**
 
@@ -450,7 +450,9 @@ admin:replace-with-strong-password
 viewer:another-password
 ```
 
-Lines starting with `#` are comments. Blank lines are ignored.
+Lines starting with `#` are comments. Blank lines are ignored. Each `username:password` entry is its own login, so add an entry to add a user. Usernames and passwords can't contain `:` or `,`, because those separate the entries.
+
+Restart the container after editing the file. Startup reads it once, so changes take effect on the next start.
 
 > [!TIP]
 > **More detail below:** click **Auth file details: permissions, SMB access, API mirroring** to expand it.
