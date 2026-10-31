@@ -168,7 +168,9 @@ check_build_hardening() {
   # HEALTHCHECK must be present with a start-period of at least 300s.
   if grep -q 'HEALTHCHECK' Dockerfile; then
     local start_period
-    start_period="$(grep 'start-period' Dockerfile | grep -oP '\d+(?=s)' | head -1)"
+    # Read only the HEALTHCHECK instruction itself (not comments that mention
+    # start-period), and use sed rather than grep -P so this also runs on macOS.
+    start_period="$(grep '^HEALTHCHECK' Dockerfile | sed -nE 's/.*--start-period=([0-9]+)s.*/\1/p' | head -1)"
     if [[ -n "${start_period}" && "${start_period}" -ge 300 ]]; then
       pass "Dockerfile HEALTHCHECK present with start-period=${start_period}s (>= 300s)"
     else
