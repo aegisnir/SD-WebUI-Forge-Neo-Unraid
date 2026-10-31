@@ -7,6 +7,11 @@ I am keeping this intentionally lightweight. This is a personal, AI-assisted hob
 
 ## [Unreleased]
 
+
+## [v2.0.0] - 2026-10-31
+
+Forge Neo: `2.31`.  First Forge Neo release, listed in Community Applications on 2026-10-30.
+
 ### Security
 
 - **No more default password:** a fresh install no longer gets `admin` / `changeme`.  First launch creates a random memorable password for `admin` and shows it once in the container log, after the `[READY]` box, and startup stops if one can't be generated.  Existing auth files are not changed: if yours still has the old default, the log keeps warning.  Until you change the first-launch password, don't post that log publicly.
@@ -32,6 +37,11 @@ I am keeping this intentionally lightweight. This is a personal, AI-assisted hob
 
 - **New README section "A1111, Forge and Forge Neo: what changed":** how the three WebUIs relate, why attention, VRAM and precision flags are no longer needed (Neo picks them on its own), features Neo removed, renamed folder flags, and a table of every dropped flag with its replacement.
 - **CUDA malloc warning** (template and README) now notes that Forge Neo's Torch Compile presets `max-autotune` and `reduce-overhead` do not work while it is on.
+
+### Fixed (after the Community Applications listing, 2026-10-31)
+
+- **Registry link in the template** now opens the GHCR package page.  `https://ghcr.io` alone redirected to GitHub's marketing page.
+- **`security-check.sh` HEALTHCHECK check** now works on macOS (no `grep -P`) and reads the real `HEALTHCHECK` line instead of the first comment that mentions `start-period`.
 
 ### Fixed (first test on the maintainer's server, 2026-10-29)
 
@@ -230,6 +240,8 @@ release 2.31. Container hardening, auth handling, log redaction and the restart 
 - security baseline now 29/29 with shellcheck enabled
 
 ---
+
+Versions `v1.0.0` to `v1.0.3` packaged AUTOMATIC1111 and were published under the old image name.  Their tags are not in this repository or this image package.
 
 ## [v1.0.3] - 2026-03-25
 
@@ -477,4 +489,4 @@ When practical, future entries may include:
 - what changed
 - why it changed
 - anything that may affect setup, upgrades, or security posture
-- the upstream AUTOMATIC1111 source state if it feels useful to record
+- the upstream Forge Neo release it is built on
