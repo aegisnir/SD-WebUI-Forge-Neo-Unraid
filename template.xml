@@ -2,7 +2,7 @@
 <Container version="2">
   <Name>SD-WebUI-Forge-Neo-Unraid</Name>
   <Repository>ghcr.io/aegisnir/sd-webui-forge-neo-unraid:dev</Repository>
-  <Registry>https://ghcr.io</Registry>
+  <Registry>https://github.com/aegisnir/SD-WebUI-Forge-Neo-Unraid/pkgs/container/sd-webui-forge-neo-unraid</Registry>
   <Icon>https://raw.githubusercontent.com/aegisnir/sd-webui-forge-neo-unraid/dev/icon.png</Icon>
   <ExtraParams>--runtime=nvidia --read-only --tmpfs /tmp:rw,noexec,nosuid,nodev,size=2g --security-opt no-new-privileges:true --cap-drop=ALL --cap-add=CHOWN --cap-add=FOWNER --cap-add=SETUID --cap-add=SETGID --pids-limit=2048</ExtraParams>
   <PostArgs></PostArgs>
