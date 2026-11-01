@@ -5,6 +5,21 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
+# The Unraid template is not in this repo.  It lives in aegisnir/unraid-templates,
+# which is what Community Applications installs from, so that is the copy the
+# hardening checks below test.  Keeping one template avoids two copies drifting.
+# To test a local edit before pushing it, set TEMPLATE_FILE to that file:
+#   TEMPLATE_FILE=../unraid-templates/templates/sd-webui-forge-neo-unraid.xml ./scripts/security-check.sh
+TEMPLATE_URL="https://raw.githubusercontent.com/aegisnir/unraid-templates/main/templates/sd-webui-forge-neo-unraid.xml"
+if [[ -z "${TEMPLATE_FILE:-}" ]]; then
+  TEMPLATE_FILE="$(mktemp)"
+  trap 'rm -f "${TEMPLATE_FILE}"' EXIT
+  if ! curl -fsSL --max-time 30 "${TEMPLATE_URL}" -o "${TEMPLATE_FILE}"; then
+    printf '[FAIL] Could not download the Unraid template from %s\n' "${TEMPLATE_URL}"
+    exit 1
+  fi
+fi
+
 PASS_COUNT=0
 FAIL_COUNT=0
 
@@ -21,26 +36,28 @@ fail() {
 check_runtime_defaults() {
   local extra_params privileged
 
-  extra_params="$(python3 - <<'PY'
+  extra_params="$(python3 - "${TEMPLATE_FILE}" <<'PY'
+import sys
 import xml.etree.ElementTree as ET
-root = ET.parse('template.xml').getroot()
+root = ET.parse(sys.argv[1]).getroot()
 node = root.find('ExtraParams')
 print((node.text or '').strip())
 PY
 )"
 
-  privileged="$(python3 - <<'PY'
+  privileged="$(python3 - "${TEMPLATE_FILE}" <<'PY'
+import sys
 import xml.etree.ElementTree as ET
-root = ET.parse('template.xml').getroot()
+root = ET.parse(sys.argv[1]).getroot()
 node = root.find('Privileged')
 print((node.text or '').strip().lower())
 PY
 )"
 
   if [[ "${privileged}" == "false" ]]; then
-    pass "template.xml Privileged=false"
+    pass "Unraid template Privileged=false"
   else
-    fail "template.xml Privileged is not false (found: ${privileged})"
+    fail "Unraid template Privileged is not false (found: ${privileged})"
   fi
 
   local required_flags=(
@@ -147,14 +164,15 @@ check_syntax_and_template() {
     printf '[SKIP] shellcheck not installed\n'
   fi
 
-  if python3 - <<'PY'
+  if python3 - "${TEMPLATE_FILE}" <<'PY'
+import sys
 import xml.etree.ElementTree as ET
-ET.parse('template.xml')
+ET.parse(sys.argv[1])
 PY
   then
-    pass "template.xml parses successfully"
+    pass "Unraid template parses successfully"
   else
-    fail "template.xml parse failed"
+    fail "Unraid template parse failed"
   fi
 
   if grep -RIn "mktemp -u" start.sh entrypoint.sh >/dev/null 2>&1; then

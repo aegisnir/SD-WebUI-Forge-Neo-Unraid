@@ -32,7 +32,9 @@ Automated runner:
 
 ### Runtime hardening defaults
 
-- [ ] PASS if `template.xml` keeps `Privileged` set to `false`.
+The Unraid template lives in [aegisnir/unraid-templates](https://github.com/aegisnir/unraid-templates/blob/main/templates/sd-webui-forge-neo-unraid.xml), not in this repository.  The script downloads it from there.  To test a local edit before pushing it, set `TEMPLATE_FILE` to that file.
+
+- [ ] PASS if the Unraid template keeps `Privileged` set to `false`.
 - [ ] PASS if default `ExtraParams` includes all of the following:
 	`--read-only`, `--tmpfs /tmp:rw,noexec,nosuid,nodev,size=2g`,
 	`--security-opt no-new-privileges:true`, `--cap-drop=ALL`,
@@ -43,7 +45,7 @@ Automated runner:
 Verification command:
 
 ```bash
-grep -n "<ExtraParams>\|<Privileged>" template.xml
+curl -fsSL https://raw.githubusercontent.com/aegisnir/unraid-templates/main/templates/sd-webui-forge-neo-unraid.xml | grep -n "<ExtraParams>\|<Privileged>"
 ```
 
 ### Startup privilege model
@@ -79,8 +81,7 @@ grep -n 'WEBUI_AUTH_FILE\|api-auth\|gradio-auth\|WEBUI_AUTH_SAMPLE_FILE\|no usab
 	`bash -n entrypoint.sh && bash -n start.sh`
 - [ ] PASS if shellcheck passes for startup scripts:
 	`shellcheck -s bash entrypoint.sh start.sh`
-- [ ] PASS if template XML parses:
-	`python3 -c "import xml.etree.ElementTree as ET; ET.parse('template.xml')"`
+- [ ] PASS if the Unraid template XML parses (checked by `scripts/security-check.sh`).
 - [ ] PASS if README, template, and changelog describe the same hardening defaults.
 
 ### Build hardening
@@ -129,7 +130,7 @@ grep -n 'umask 077' start.sh
 
 ### HTTPS
 
-- [ ] PASS if `WEBUI_TLS` defaults to `auto` (HTTPS on) in both the Dockerfile/start.sh and `template.xml`.
+- [ ] PASS if `WEBUI_TLS` defaults to `auto` (HTTPS on) in both the Dockerfile/start.sh and the Unraid template.
 - [ ] PASS if the self-signed private key is created under `umask 077` and `/config/tls` is mode 700.
 - [ ] PASS if `WEBUI_TLS_HOSTNAMES` entries are validated against a strict hostname/IPv4 pattern before reaching `openssl`.
 - [ ] PASS if `start.sh` never adds `--disable-tls-verify` (verification uses the `SSL_CERT_FILE` trust bundle instead).
@@ -233,10 +234,10 @@ Neo removed the A1111 `.yaml` model-config code path (CVE-2026-111986), and alwa
 
 If you notice a security issue, risky assumption, or something that looks clearly unsafe, constructive feedback is welcome.
 
-For now, the simplest approach is to open an issue **only if you are comfortable discussing it publicly**.
+- **Sensitive issues** (anything that could put other users at risk): report them privately through [GitHub's private vulnerability reporting](https://github.com/aegisnir/SD-WebUI-Forge-Neo-Unraid/security/advisories/new).  Only the maintainer can see the report.  Please do not open a public issue for these.
+- **Everything else**: open a regular issue.
 
-> [!CAUTION]
-> If the concern is sensitive and should not be posted publicly, please use your judgment and avoid sharing details in a way that would unnecessarily expose other users. A more formal private reporting process may be added later if this project grows enough to justify it.
+Problems in Forge Neo itself (not this packaging) should also go to [Forge Neo](https://github.com/Haoming02/sd-webui-forge-classic/tree/neo).
 
 ## Third-party content
 

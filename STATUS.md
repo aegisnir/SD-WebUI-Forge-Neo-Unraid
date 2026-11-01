@@ -120,8 +120,6 @@
   header size cap).
 - Confirm the app appears in Community Applications once its feed is rebuilt.
 - Test the Lobe Theme fixes with Lobe on and off in a built image.
-- Retire or sync this repository's `template.xml` now that the Community Applications template
-  (in `aegisnir/unraid-templates`) is the main one.
 
 ## Session 14 Changes (adversarial code review remediation)
 

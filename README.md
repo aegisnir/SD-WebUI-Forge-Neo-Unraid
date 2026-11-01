@@ -1017,8 +1017,8 @@ Unraid's "update available" check does not work for an image you built yourself;
 
 Two channels are published:
 
-- `ghcr.io/aegisnir/sd-webui-forge-neo-unraid:latest`: stable, built from the `main` branch. The Community Applications template uses it by default.
-- `ghcr.io/aegisnir/sd-webui-forge-neo-unraid:dev`: testing, built from the `dev` branch on every change. It may break. The `template.xml` in this repository uses it.
+- `ghcr.io/aegisnir/sd-webui-forge-neo-unraid:latest`: stable, built from the `main` branch. The Community Applications template uses it by default.  That template lives in [aegisnir/unraid-templates](https://github.com/aegisnir/unraid-templates), not in this repository.
+- `ghcr.io/aegisnir/sd-webui-forge-neo-unraid:dev`: testing, built from the `dev` branch on every change. It may break.
 
 To switch an installed container between them, edit the container and change the tag at the end of **Repository**.
 
