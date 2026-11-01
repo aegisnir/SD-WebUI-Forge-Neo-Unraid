@@ -7,7 +7,7 @@
 # used by PostgreSQL, Redis, Nginx, and many other production container images.
 # Privileges are immediately dropped to UID 99 (nobody/users) via `setpriv`
 # before exec-ing start.sh. Runtime hardening is applied at the Docker level
-# via template.xml: --cap-drop=ALL, --security-opt no-new-privileges:true, etc.
+# via the Unraid template (aegisnir/unraid-templates): --cap-drop=ALL, --security-opt no-new-privileges:true, etc.
 DS002
 
 # ------------------------------------------------------------------------------

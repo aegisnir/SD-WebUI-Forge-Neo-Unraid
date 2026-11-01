@@ -7,6 +7,12 @@ I am keeping this intentionally lightweight. This is a personal, AI-assisted hob
 
 ## [Unreleased]
 
+### Changed
+- Removed this repository's `template.xml`.  The only Unraid template is now the one Community Applications uses, in `aegisnir/unraid-templates`.  `scripts/security-check.sh` checks that copy.
+
+### Security
+- Sensitive security reports now go through GitHub's private vulnerability reporting (see `SECURITY.md`).
+
 
 ## [v2.0.0] - 2026-10-31
 
