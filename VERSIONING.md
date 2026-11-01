@@ -31,7 +31,7 @@ The current tagging strategy:
 
 - `:latest`: stable tag, built from the `main` branch (the repository's default branch). Changes reach `main` only after they have run on `dev`. Recommended for most users.
 - `:dev`: testing tag, built from the `dev` branch on every change. Use this if you want new changes first and don't mind the occasional breakage.
-- `:vX.Y.Z` (e.g. `:v1.0.0`): pinned version tags for specific tested states. Use these if you want reproducibility.
+- `:vX.Y.Z` (e.g. `:v2.0.0`): pinned version tags for specific tested states. Use these if you want reproducibility.
 
 Both `:latest` and `:dev` are also rebuilt when the nightly check finds new Ubuntu or Python package updates for them.
 
