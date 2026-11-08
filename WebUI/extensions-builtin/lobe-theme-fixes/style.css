@@ -28,3 +28,28 @@ body:has(.draggable-panel) #quicksettings .secondary-wrap input {
   width: auto !important;
   min-width: 0 !important;
 }
+
+/* VAE / Text Encoder arrow stuck on the left edge.  Lobe stretches every span in
+   Quick Settings to full width (meant for text labels).  That multi-select's
+   arrow sits in a span, which Forge pins to the right at a fixed width; stretched,
+   the arrow ends up on the left.  Restore the fixed width. */
+body:has(.draggable-panel) #quicksettings span.icon-wrap {
+  width: var(--size-5) !important;
+}
+
+/* Hint text under a field ran across the field next to it (Checkpoint Merger:
+   "will be based on Interpolation Method..." over "Layers to Discard").  Lobe
+   keeps every label on one line, and in Gradio 4 the label wraps the whole field,
+   hint included.  Let the hint wrap.  It always follows the field title. */
+body:has(.draggable-panel) [data-testid="block-info"] + div {
+  white-space: normal !important;
+}
+
+/* Settings titles cut off with "...".  Lobe trims every field title to one line,
+   and Settings puts its explanation inside the title ("Output Directory for
+   Hires. fix Images (if empty, save in the txt2img folder above)").  Let Settings
+   titles wrap so the explanation stays readable. */
+body:has(.draggable-panel) #tab_settings label > [data-testid="block-info"] {
+  white-space: normal !important;
+  overflow: visible !important;
+}
