@@ -10,6 +10,9 @@ I am keeping this intentionally lightweight. This is a personal, AI-assisted hob
 ### Changed
 - Removed this repository's `template.xml`.  The only Unraid template is now the one Community Applications uses, in `aegisnir/unraid-templates`.  `scripts/security-check.sh` checks that copy.
 
+### Fixed
+- **Extensions work on their first run.**  Packages an extension installed on its first start (Infinite Image Browsing, CivitAI Browser Neo and others) failed with "No module named ..." until the container was restarted.  Python only searches the extension package folder if it already exists at startup, and on a fresh install it didn't.  Startup now creates it first.
+
 ### Security
 - Sensitive security reports now go through GitHub's private vulnerability reporting (see `SECURITY.md`).
 

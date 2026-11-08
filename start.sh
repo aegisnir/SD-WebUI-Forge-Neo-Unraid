@@ -193,6 +193,15 @@ find "${TMPDIR:?}" -mindepth 1 -delete 2>/dev/null || true
 mkdir -p "${RUNTIME_WEBUI_TMP_DIR}"
 mkdir -p "${PIP_CACHE_DIR}"
 mkdir -p "${PYTHONUSERBASE}"
+# Python adds the per-user site-packages folder to its import path only if the
+# folder already exists when Python starts.  On a fresh /data it doesn't, so
+# packages an extension installs on its first run land in a folder the running
+# WebUI never searches, and the extension fails with "No module named ..."
+# until the next restart.  Creating the folder now makes them importable at once.
+_user_site="$("${PYTHON_BIN}" -c 'import site; print(site.getusersitepackages())' 2>/dev/null || true)"
+if [[ -n "${_user_site}" ]]; then
+  mkdir -p "${_user_site}"
+fi
 # Ensure standard data subtrees exist so the WebUI finds expected paths on a
 # fresh or restored /data volume without requiring the user to re-create them.
 # Neo's default output folder is /data/output (A1111 used /data/outputs).
