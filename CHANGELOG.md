@@ -13,7 +13,8 @@ I am keeping this intentionally lightweight. This is a personal, AI-assisted hob
 ### Fixed
 - **Extensions work on their first run.**  Packages an extension installed on its first start (Infinite Image Browsing, CivitAI Browser Neo and others) failed with "No module named ..." until the container was restarted.  Python only searches the extension package folder if it already exists at startup, and on a fresh install it didn't.  Startup now creates it first.
 - **Lobe Theme: VAE / Text Encoder arrow back on the right.**  In Quick Settings, that dropdown's arrow sat on the left edge of an empty box.
-- **Lobe Theme: hint text no longer runs over the next field** (for example on Checkpoint Merger), and **Settings titles wrap** instead of being cut off with "...", so their explanations stay readable.
+- **Lobe Theme: hint text no longer runs over the next field** (for example on Checkpoint Merger), and **field titles wrap** instead of being cut off with "..." (slider titles like "Hires steps", and Settings titles with their explanations).
+- **Lobe Theme: Apply settings result no longer covers the Settings list.**  Checkbox labels in Settings and the license text in Settings > Licenses stay inside their boxes.
 
 ### Security
 - Sensitive security reports now go through GitHub's private vulnerability reporting (see `SECURITY.md`).

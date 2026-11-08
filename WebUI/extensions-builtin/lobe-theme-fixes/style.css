@@ -45,11 +45,38 @@ body:has(.draggable-panel) [data-testid="block-info"] + div {
   white-space: normal !important;
 }
 
-/* Settings titles cut off with "...".  Lobe trims every field title to one line,
-   and Settings puts its explanation inside the title ("Output Directory for
-   Hires. fix Images (if empty, save in the txt2img folder above)").  Let Settings
-   titles wrap so the explanation stays readable. */
-body:has(.draggable-panel) #tab_settings label > [data-testid="block-info"] {
+/* Field titles cut off with "...".  Lobe trims every field title to one line.
+   Slider titles share their row with the number box ("Hires steps", "Resize
+   width to", "Refiner CFG Scale"), and Settings puts its explanation inside the
+   title ("Output Directory for Hires. fix Images (if empty, save in the txt2img
+   folder above)").  Let titles wrap; ones that already fit don't change. */
+body:has(.draggable-panel) label > [data-testid="block-info"] {
   white-space: normal !important;
   overflow: visible !important;
+}
+
+/* Checkbox labels ran past their box and under the side panel (Settings:
+   "Automatically save every generated image (if disabled, ...)").  Same Lobe
+   one-line rule.  Limited to Gradio checkboxes so the Extensions table keeps
+   its one-line names. */
+body:has(.draggable-panel) .gradio-checkbox > label {
+  white-space: normal !important;
+}
+
+/* After Apply settings, the result ("549 settings changed: ...") spilled over
+   the Settings section list.  Forge fixes that line at one line tall, and Lobe's
+   narrower middle column makes the message wrap.  Let it grow to a few lines,
+   then scroll. */
+body:has(.draggable-panel) #settings_result {
+  height: auto !important;
+  max-height: 6em;
+  overflow-y: auto;
+}
+
+/* Settings > Licenses: license text ran 237px past its box.  It is
+   preformatted, so it can't wrap at Lobe's narrower width.  Wrap it, keeping
+   its line breaks. */
+body:has(.draggable-panel) #licenses pre {
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere;
 }
