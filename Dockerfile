@@ -92,7 +92,7 @@ FROM ghcr.io/astral-sh/uv:0.13.7@sha256:96f40d3904aad8d0bd010539001d36c8e2188b98
 # Base image: NVIDIA CUDA runtime (Ubuntu 22.04), pinned by digest.
 # Update this digest intentionally whenever you choose to refresh the base image.
 # ------------------------------------------------------------------------------
-FROM nvidia/cuda:13.0.2-runtime-ubuntu22.04@sha256:cc28faec68e3dffcf6803683d34a03dcd62fe29e58a0b34b710b800a3d7b73b3 AS build
+FROM nvidia/cuda:13.5.0-runtime-ubuntu22.04@sha256:a69a11a11011db340c0c4572e7decb923f4bbbcd129f2b3cae878d48eeb4536a AS build
 
 # Use bash with -euo pipefail for safer RUN pipelines (matches set -euo in scripts).
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
@@ -315,7 +315,7 @@ RUN python3 /tmp/split-layers.py /opt/python 10 > /tmp/split.plan \
 # ==============================================================================
 # Runtime stage
 # ==============================================================================
-FROM nvidia/cuda:13.0.2-runtime-ubuntu22.04@sha256:cc28faec68e3dffcf6803683d34a03dcd62fe29e58a0b34b710b800a3d7b73b3
+FROM nvidia/cuda:13.5.0-runtime-ubuntu22.04@sha256:a69a11a11011db340c0c4572e7decb923f4bbbcd129f2b3cae878d48eeb4536a
 
 # Use bash with -euo pipefail for safer RUN pipelines (matches set -euo in scripts).
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
