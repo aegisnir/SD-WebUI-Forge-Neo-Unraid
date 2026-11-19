@@ -85,7 +85,7 @@ ARG TORCHVISION_VERSION=0.29.0+cu130
 ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cu130
 
 # uv is only used during the build, to install Python and packages quickly.
-FROM ghcr.io/astral-sh/uv:0.13.7@sha256:96f40d3904aad8d0bd010539001d36c8e2188b981e1334471a90c4a1d93bb490 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.9@sha256:d3b601f0c7b118bc1753febf7c41cc80981df678445e0254284eecf84db79a7d AS uv
 
 
 # ------------------------------------------------------------------------------
