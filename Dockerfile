@@ -76,8 +76,8 @@
 # treats build args as poor places for sensitive values because they may show up
 # in build metadata, layer history, logs, or external attestations depending on
 # how and where the image is built.
-ARG WEBUI_TAG=2.31
-ARG WEBUI_REF=c358e55deace6a086af0a547026652ef36daa9c4
+ARG WEBUI_TAG=2.33
+ARG WEBUI_REF=5998fb39ea347dfe3a72a8ec88a971e909ed8738
 
 # PyTorch build Neo installs by default (modules/launch_utils.py, prepare_environment).
 ARG TORCH_VERSION=2.14.0+cu130
