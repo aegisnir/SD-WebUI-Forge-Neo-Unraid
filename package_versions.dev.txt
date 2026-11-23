@@ -179,7 +179,7 @@ libsm6=2:1.2.3-1build2
 libsmartcols1=2.37.2-4ubuntu3.6
 libsqlite3-0=3.37.2-2ubuntu0.8
 libss2=1.46.5-2ubuntu1.2
-libssh-4=0.9.6-2ubuntu0.22.04.8
+libssh-4=0.9.6-2ubuntu0.22.04.9
 libssl3=3.0.2-0ubuntu1.30
 libstdc++-11-dev=11.4.0-1ubuntu1~22.04.3
 libstdc++6=12.3.0-1ubuntu1~22.04.3
@@ -265,7 +265,7 @@ audioop-lts==0.2.2
 av==17.1.0
 certifi==2026.11.20
 cffi==2.1.1
-charset-normalizer==3.5.2
+charset-normalizer==3.5.3
 click==8.5.1
 comfy-kitchen==0.2.39
 contourpy==1.4.0
@@ -403,7 +403,7 @@ typing_extensions==4.16.0
 tzdata==2026.6
 urllib3==2.8.0
 uvicorn==0.54.0
-wcwidth==0.9.4
+wcwidth==0.9.5
 webencodings==0.6.1
 websockets==12.0
 yacs==0.1.8
