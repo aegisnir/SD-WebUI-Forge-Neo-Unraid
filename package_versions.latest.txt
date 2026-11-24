@@ -14,7 +14,7 @@ ca-certificates=20260816ubuntu0.22.04.2
 coreutils=8.32-4.1ubuntu1.4
 cpp-11=11.4.0-1ubuntu1~22.04.3
 cpp=4:11.2.0-1ubuntu1
-cuda-compat-13-0=580.196.07-1ubuntu1
+cuda-compat-13-0=580.196.11-1ubuntu1
 cuda-cudart-13-0=13.0.96-1
 cuda-keyring=1.1-1
 cuda-libraries-13-0=13.0.2-1
@@ -265,7 +265,7 @@ audioop-lts==0.2.2
 av==17.1.0
 certifi==2026.11.20
 cffi==2.1.1
-charset-normalizer==3.5.2
+charset-normalizer==3.5.3
 click==8.5.1
 comfy-kitchen==0.2.39
 contourpy==1.4.0
@@ -364,8 +364,8 @@ pyparsing==3.3.3
 python-dateutil==4.0.0
 python-multipart==0.0.34
 pytz==2026.6
-regex==2026.11.19
-reportlab==5.1.0
+regex==2026.11.23
+reportlab==5.1.1
 requests==2.34.2
 rich==14.3.4
 ruff==0.17.6
