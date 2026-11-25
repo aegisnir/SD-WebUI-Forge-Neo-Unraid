@@ -100,7 +100,7 @@ libdrm2=2.4.113-2~ubuntu0.22.04.1
 libedit2=3.1-20210910-1build1
 libelf1=0.186-1ubuntu0.1
 liberror-perl=0.17029-1
-libexpat1=2.4.7-1ubuntu0.9
+libexpat1=2.4.7-1ubuntu0.10
 libext2fs2=1.46.5-2ubuntu1.2
 libffi8=3.4.2-4
 libgcc-11-dev=11.4.0-1ubuntu1~22.04.3
@@ -211,7 +211,7 @@ libxdmcp6=1:1.1.3-0ubuntu5
 libxext6=2:1.3.4-1build1
 libxfixes3=1:6.0.0-1
 libxml2=2.9.13+dfsg-1ubuntu0.14
-libxrender1=1:0.9.10-1build4
+libxrender1=1:0.9.10-1ubuntu0.22.04.1
 libxshmfence1=1.3-1build4
 libxxf86vm1=1:1.1.4-1build3
 libxxhash0=0.8.1-1
@@ -285,7 +285,7 @@ ffmpy==1.0.0
 filelock==4.2.4
 filterpy==2.0.0
 flatbuffers==25.12.19
-fonttools==4.68.0
+fonttools==4.69.1
 fsspec==2026.9.0
 ftfy==6.3.1
 fvcore==0.1.5.post20221221
@@ -364,8 +364,8 @@ pyparsing==3.3.3
 python-dateutil==4.0.0
 python-multipart==0.0.34
 pytz==2026.6
-regex==2026.11.19
-reportlab==5.1.0
+regex==2026.11.24
+reportlab==5.1.2
 requests==2.34.2
 rich==14.3.4
 ruff==0.17.6
