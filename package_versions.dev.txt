@@ -4,9 +4,9 @@ apt=2.4.15ubuntu0.1
 base-files=12ubuntu4.7
 base-passwd=3.5.52build1
 bash=5.1-6ubuntu1.1
-binutils-common=2.38-4ubuntu2.12
-binutils-x86-64-linux-gnu=2.38-4ubuntu2.12
-binutils=2.38-4ubuntu2.12
+binutils-common=2.38-4ubuntu2.14
+binutils-x86-64-linux-gnu=2.38-4ubuntu2.14
+binutils=2.38-4ubuntu2.14
 bsdutils=1:2.37.2-4ubuntu3.6
 build-essential=12.9ubuntu3
 bzip2=1.0.8-5ubuntu0.1
@@ -64,7 +64,7 @@ libatomic1=12.3.0-1ubuntu1~22.04.3
 libattr1=1:2.5.1-1ubuntu0.1
 libaudit-common=1:3.0.7-1ubuntu0.1
 libaudit1=1:3.0.7-1ubuntu0.1
-libbinutils=2.38-4ubuntu2.12
+libbinutils=2.38-4ubuntu2.14
 libblkid1=2.37.2-4ubuntu3.6
 libbrotli1=1.0.9-2ubuntu0.1
 libbsd0=0.11.5-1
@@ -79,8 +79,8 @@ libcc1-0=12.3.0-1ubuntu1~22.04.3
 libcom-err2=1.46.5-2ubuntu1.2
 libcrypt-dev=1:4.4.27-1
 libcrypt1=1:4.4.27-1
-libctf-nobfd0=2.38-4ubuntu2.12
-libctf0=2.38-4ubuntu2.12
+libctf-nobfd0=2.38-4ubuntu2.14
+libctf0=2.38-4ubuntu2.14
 libcublas-13-0=13.1.0.3-1
 libcufft-13-0=12.0.0.61-1
 libcufile-13-0=1.15.1.6-1
@@ -313,7 +313,7 @@ lark==1.3.1
 lazy-importer==0.1.0
 lazy-loader==0.6
 llvmlite==0.50.0
-lxml==6.1.3
+lxml==6.2.0
 markdown-it-py==4.3.0
 matplotlib==3.11.2
 mdurl==0.1.2
@@ -364,7 +364,7 @@ pyparsing==3.3.3
 python-dateutil==4.0.0
 python-multipart==0.0.34
 pytz==2026.6
-regex==2026.11.24
+regex==2026.11.25
 reportlab==5.1.2
 requests==2.34.2
 rich==14.3.4
@@ -380,11 +380,11 @@ sounddevice==0.5.6
 spandrel==0.4.2
 spandrel_extra_arches==0.2.0
 starlette==0.50.0
-svglib==2.4.0
+svglib==2.5.0
 sympy==1.14.0
 tabulate==0.10.0
 termcolor==3.3.0
-tifffile==2026.11.16
+tifffile==2026.11.26
 timm==1.0.31
 tinycss2==1.5.1
 tokenizers==0.22.2
@@ -397,7 +397,7 @@ trampoline==0.1.2
 transformers==4.57.6
 triton==3.8.0
 truststore==0.10.5
-typer==0.29.2
+typer==0.29.3
 typing-inspection==0.4.5
 typing_extensions==4.16.0
 tzdata==2026.6
